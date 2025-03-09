@@ -32,7 +32,7 @@ require_once 'header.php';
 	</button>
 </div>
 
-<div class="section white error">No team has been defined. Please define a team in the TeamGeneratorRank.js file.</div>
+<div class="section white error">No team has been defined. Please define a team in the TeamGenerator.js file.</div>
 
 <?php require 'modules/ads/body-728.php'; ?>
 
@@ -130,7 +130,7 @@ require_once 'header.php';
 <script src="<?php echo $WEB_ROOT; ?>js/battle/TimelineAction.js?v=<?php echo $SITE_VERSION; ?>"></script>
 <script src="<?php echo $WEB_ROOT; ?>js/battle/Battle.js?v=<?php echo $SITE_VERSION; ?>"></script>
 <script src="<?php echo $WEB_ROOT; ?>js/battle/TeamRanker.js?v=<?php echo $SITE_VERSION; ?>"></script>
-<script src="<?php echo $WEB_ROOT; ?>js/interface/TeamGeneratorRank.js?v=<?php echo $SITE_VERSION; ?>"></script>
+<script src="<?php echo $WEB_ROOT; ?>js/interface/TeamGenerator.js?v=<?php echo $SITE_VERSION; ?>"></script>
 <script src="<?php echo $WEB_ROOT; ?>js/Main.js?v=3"></script>
 
 <script>
@@ -173,18 +173,14 @@ $(document).ready(function() {
 		}
 	});
 	
-	// Set up the Evaluate All Teams button
+	// Set up the Evaluate All Teams button to use TeamGenerator.js
 	$(".evaluate-all-teams-btn").on("click", function() {
-		console.log("Evaluate All Teams button clicked");
+		console.log("Find Best Teams button clicked");
 		
 		// Hide error message by default
 		$(".section.error").hide();
 		
-		// Display warning with confirm dialog
-		// if (confirm("This will evaluate thousands of team combinations and may take several minutes to complete. Do you want to continue?")) {
-		// 	// Call the evaluate all teams function
-		// }
-
+		// Call the evaluateAllTeams function from TeamGenerator.js
 		var teamGenerator = InterfaceMaster.getInstance();
 		teamGenerator.context = "team-generator";
 		teamGenerator.evaluateAllTeams();
