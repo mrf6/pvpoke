@@ -1800,6 +1800,11 @@ function Pokemon(id, i, b){
 		self.cooldown = self.startCooldown;
 		self.damageWindow = 0;
 		self.shields = self.startingShields;
+		
+		// Ensure startStatBuffs is initialized before accessing it
+		if (!self.startStatBuffs) {
+			self.startStatBuffs = [0, 0];
+		}
 		self.statBuffs = [self.startStatBuffs[0], self.startStatBuffs[1]];
 
 		if(self.activeFormId != self.startFormId){
