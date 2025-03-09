@@ -62,6 +62,162 @@ var InterfaceMaster = (function () {
                 return runTeamEvaluation();
             };
             
+            // Set up the Pokémon selection UI
+            this.initializePokemonSelector = function() {
+                var self = this;
+                var includeList = []; // Store the selected Pokémon IDs
+                var pokemonData = {}; // Store mapping of Pokémon IDs to names
+                
+                // Function to render the include list
+                function renderIncludeList() {
+                    var $list = $(".include-pokemon-list");
+                    $list.empty();
+                    
+                    for (var i = 0; i < includeList.length; i++) {
+                        var pokemonId = includeList[i];
+                        var displayName = pokemonData[pokemonId] || pokemonId;
+                        
+                        var $item = $('<div class="include-pokemon-item" data-id="' + pokemonId + '">' + 
+                                      '<span class="name">' + displayName + '</span>' + 
+                                      '<span class="remove">×</span>' + 
+                                      '</div>');
+                        
+                        $list.append($item);
+                    }
+                    
+                    // Show/hide add button based on current selection count
+                    if (includeList.length >= 3) {
+                        $(".add-include-btn").hide();
+                    } else {
+                        $(".add-include-btn").show();
+                    }
+                }
+                
+                // Load Pokémon data for autocomplete
+                function loadPokemonData(callback) {
+                    var formatValue = $(".format-select").val();
+                    var cupValue = $(".format-select option:selected").attr("cup") || "all";
+                    var cp = parseInt(formatValue) || 1500;
+                    
+                    battle.setCP(cp);
+                    battle.setCup(cupValue);
+                    
+                    var key = battle.getCup().name + "overall" + battle.getCP();
+                    
+                    if (!gm.rankings[key]) {
+                        gm.loadRankingData({
+                            displayRankingData: function() {
+                                var rankings = gm.rankings[key];
+                                for (var i = 0; i < rankings.length; i++) {
+                                    pokemonData[rankings[i].speciesId] = rankings[i].speciesName;
+                                }
+                                callback();
+                            }
+                        }, "overall", battle.getCP(), battle.getCup().name);
+                    } else {
+                        var rankings = gm.rankings[key];
+                        for (var i = 0; i < rankings.length; i++) {
+                            pokemonData[rankings[i].speciesId] = rankings[i].speciesName;
+                        }
+                        callback();
+                    }
+                }
+                
+                // Handle the Add Pokémon button click
+                $(".add-include-btn").on("click", function() {
+                    loadPokemonData(function() {
+                        // Show the modal
+                        $(".include-search-modal").css("display", "block");
+                        
+                        // Focus the search input
+                        $(".poke-search").focus();
+                    });
+                });
+                
+                // Close the modal when the × is clicked
+                $(".close-modal").on("click", function() {
+                    $(".include-search-modal").css("display", "none");
+                });
+                
+                // Close the modal when clicking outside of it
+                $(window).on("click", function(event) {
+                    if ($(event.target).hasClass("modal")) {
+                        $(".include-search-modal").css("display", "none");
+                    }
+                });
+                
+                // Handle the search input
+                $(".poke-search").on("input", function() {
+                    var query = $(this).val().toLowerCase();
+                    var $results = $(".search-results");
+                    
+                    $results.empty();
+                    
+                    if (query.length < 2) return;
+                    
+                    var matches = [];
+                    
+                    // Search by ID and name
+                    for (var id in pokemonData) {
+                        var name = pokemonData[id];
+                        
+                        if (id.toLowerCase().includes(query) || name.toLowerCase().includes(query)) {
+                            matches.push({
+                                id: id,
+                                name: name
+                            });
+                        }
+                        
+                        // Limit to 20 results for performance
+                        if (matches.length >= 20) break;
+                    }
+                    
+                    // Display results
+                    for (var i = 0; i < matches.length; i++) {
+                        var match = matches[i];
+                        var $item = $('<div class="search-item" data-id="' + match.id + '">' + match.name + ' (' + match.id + ')</div>');
+                        $results.append($item);
+                    }
+                });
+                
+                // Handle clicking on a search result
+                $(document).on("click", ".search-item", function() {
+                    var pokemonId = $(this).data("id");
+                    
+                    // Don't add duplicates
+                    if (includeList.indexOf(pokemonId) === -1) {
+                        includeList.push(pokemonId);
+                        renderIncludeList();
+                    }
+                    
+                    // Close the modal
+                    $(".include-search-modal").css("display", "none");
+                    $(".poke-search").val("");
+                    $(".search-results").empty();
+                });
+                
+                // Handle removing a Pokémon from the include list
+                $(document).on("click", ".include-pokemon-item .remove", function() {
+                    var $item = $(this).closest(".include-pokemon-item");
+                    var pokemonId = $item.data("id");
+                    
+                    // Remove from the list
+                    includeList = includeList.filter(function(id) {
+                        return id !== pokemonId;
+                    });
+                    
+                    renderIncludeList();
+                });
+                
+                // Method to get the current include list
+                this.getIncludeList = function() {
+                    return includeList;
+                };
+                
+                // Initialize the UI
+                renderIncludeList();
+            };
+            
             // Main function that runs the team evaluation process
             function runTeamEvaluation() {
                 // Show processing information
@@ -69,14 +225,23 @@ var InterfaceMaster = (function () {
                 $(".section.typings .rankings-container").html('<div class="processing-message"><p>Processing all possible teams. This may take several minutes...</p><div class="progress-container"><div class="progress-bar"></div></div><p class="progress-text">0% complete</p><p class="teams-processed">0 teams processed</p></div>');
                 
                 // Get all Pokémon data
-                var pokemonData = getAllPokemon(gm);
+                var battleRange = 150; // Only consider top 150 for battles
+                var teamRange = 100; // Use top 100 for team generation
+                var pokemonData = getAllPokemon(gm, battleRange, teamRange);
                 var allPokemon = pokemonData.allPokemon;
                 var topPokemon = pokemonData.topPokemon;
                 
                 console.log("Using top " + topPokemon.length + " Pokémon to generate teams");
                 
-                // Generate all possible 3-Pokémon combinations
-                var teams = generateTeams(topPokemon);
+                // Get the include list from the UI
+                var includeList = self.getIncludeList ? self.getIncludeList() : [];
+                
+                if (includeList.length > 0) {
+                    console.log("Generating teams that include: " + includeList.join(", "));
+                }
+                
+                // Generate all possible 3-Pokémon combinations with optional include list
+                var teams = generateTeams(topPokemon, includeList);
                 console.log("Generated " + teams.length + " possible team combinations");
                 
                 // Generate all possible matchups, INCLUDING self-matchups (same Pokemon vs itself)
@@ -210,8 +375,8 @@ var InterfaceMaster = (function () {
                 var poke1 = new Pokemon(pokemon1, 0, battle);
                 var poke2 = new Pokemon(pokemon2, 0, battle);
                 var formatValue = $(".format-select").val();
-                var cupValue = $(".format-select option:selected").attr("cup") || "all";
-                var cp = parseInt(formatValue) || 1500;
+				var cupValue = $(".format-select option:selected").attr("cup") || "all";
+				var cp = parseInt(formatValue) || 1500;
 
                 poke1.initialize(cp);
                 poke1.selectRecommendedMoveset("overall");
@@ -221,8 +386,8 @@ var InterfaceMaster = (function () {
                 poke2.selectRecommendedMoveset("overall");
                 poke2.setShields(shield2);
 
-                battle.setCP(cp);
-                battle.setCup(cupValue);
+				battle.setCP(cp);
+				battle.setCup(cupValue);
 
                 battle.setNewPokemon(poke1, 0, false);
                 battle.setNewPokemon(poke2, 1, false);
@@ -239,21 +404,21 @@ var InterfaceMaster = (function () {
             }
 
             // Get all Pokemon for the selected format/cup
-            function getAllPokemon(gm){
+            function getAllPokemon(gm, battleRange, teamRange){
                 var allPokemon = [];
                 var topPokemon = [];
 
                 var formatValue = $(".format-select").val();
-				var cupValue = $(".format-select option:selected").attr("cup") || "all";
+                var cupValue = $(".format-select option:selected").attr("cup") || "all";
 
                 var key = cupValue + "overall" + formatValue;
-				var rankings = gm.rankings[key];
+                var rankings = gm.rankings[key];
 
                 for(var i = 0; i < rankings.length; i++){
-                    if (i < 100){ // Only consider top 100 for battles
+                    if (i < battleRange){ // Only consider top 100 for battles
                         allPokemon.push(rankings[i].speciesId);
                     }
-                    if(i < 40){ // Use top 40 for team generation
+                    if(i < teamRange){ // Use top 20 for team generation
                         topPokemon.push(rankings[i].speciesId);
                     }
                 }
@@ -294,16 +459,49 @@ var InterfaceMaster = (function () {
                 return pairs;
             }
 
-            // Generate all possible teams from top Pokemon
-            function generateTeams(topPokemon){
-                var teams = self.generateCombinations(topPokemon, 3);
-                return teams;
+            // Generate all possible teams from top Pokemon with option to include specific Pokemon
+            function generateTeams(topPokemon, include) {
+                // Default include to empty array if not provided
+                include = include || [];
+                
+                if (include.length === 0) {
+                    // Case 1: No Pokemon to include, generate all possible 3-Pokemon combinations
+                    return self.generateCombinations(topPokemon, 3);
+                } else if (include.length === 3) {
+                    // Case 4: Exactly 3 Pokemon to include, just return that team
+                    return [include];
+                } else {
+                    // Cases 2 & 3: Include 1 or 2 specific Pokemon
+                    var remainingPokemon = topPokemon.filter(function(pokemon) {
+                        // Only keep Pokemon that aren't already in the include list
+                        return !include.includes(pokemon);
+                    });
+                    
+                    var teams = [];
+                    
+                    if (include.length === 1) {
+                        // Case 2: Include 1 specific Pokemon, need to pick 2 more
+                        var additionalPairs = self.generateCombinations(remainingPokemon, 2);
+                        
+                        // For each pair, create a team with the included Pokemon
+                        for (var i = 0; i < additionalPairs.length; i++) {
+                            teams.push([include[0], additionalPairs[i][0], additionalPairs[i][1]]);
+                        }
+                    } else if (include.length === 2) {
+                        // Case 3: Include 2 specific Pokemon, need to pick 1 more
+                        for (var i = 0; i < remainingPokemon.length; i++) {
+                            teams.push([include[0], include[1], remainingPokemon[i]]);
+                        }
+                    }
+                    
+                    return teams;
+                }
             }
 
             // Calculate threat score for a team with all shield scenarios
             function calculateThreatScore(team, battleResults, allPokemon){
                 var threatScores = [];
-                
+
                 // Define all shield scenarios
                 var shieldScenarios = [
                     {atk: 0, def: 0},
@@ -331,7 +529,7 @@ var InterfaceMaster = (function () {
                         var validMatchups = 0;
 
                         // For each Pokemon in our team
-                        for(var j = 0; j < team.length; j++){
+                    for(var j = 0; j < team.length; j++){
                             // Check matchup with this shield configuration
                             var key = keyFormat + team[j] + "_" + allPokemon[i];
                             if (battleResults[key] !== undefined) {
@@ -402,7 +600,7 @@ var InterfaceMaster = (function () {
                 html += '<p class="center">Threat scores calculated using all 9 possible shield scenarios (0-0, 0-1, 0-2, 1-0, 1-1, 1-2, 2-0, 2-1, 2-2)</p>';
                 html += '<table class="teams-table rating-table" cellspacing="0">';
                 html += '<thead><tr><th>Rank</th><th>Team</th><th>Threat Score</th></tr></thead><tbody>';
-                
+  
                 for (var i = 0; i < numToShow; i++) {
                     var result = rankedTeams[i];
                     
@@ -435,6 +633,16 @@ var InterfaceMaster = (function () {
                 rankedTeams = null;
             }
 
+            // Helper function to get URL parameters
+            function getURLParameter(name) {
+                var url = window.location.href;
+                name = name.replace(/[\[\]]/g, '\\$&');
+                var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+                    results = regex.exec(url);
+                if (!results) return null;
+                if (!results[2]) return '';
+                return decodeURIComponent(results[2].replace(/\+/g, ' '));
+			}
 
 		    // Generate all possible combinations of size k from an array
 			this.generateCombinations = function(arr, k) {

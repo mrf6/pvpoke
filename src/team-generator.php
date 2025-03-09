@@ -17,6 +17,20 @@ require_once 'header.php';
 	<?php require 'modules/formatselect.php'; ?>
 </div>
 
+<div class="section include-pokemon-container white">
+	<h3>Include Specific Pokémon (Optional)</h3>
+	<p>Select up to 3 Pokémon that must be included in every team combination.</p>
+	
+	<div class="include-pokemon-list"></div>
+	
+	<button class="add-include-btn button">
+		<span class="btn-content-wrap">
+			<span class="btn-icon btn-icon-add"></span>
+			<span class="btn-label">Add Pokémon</span>
+		</span>
+	</button>
+</div>
+
 <div class="button-container">
 	<!-- <button class="generate-rankings-btn button">
 		<span class="btn-content-wrap">
@@ -56,6 +70,20 @@ require_once 'header.php';
 			<div class="copy">Copy</div>
 		</div>
 	</div> -->
+</div>
+
+<!-- Add modal for Pokémon search -->
+<div class="modal include-search-modal">
+	<div class="modal-content">
+		<div class="modal-header">
+			<h3>Select a Pokémon</h3>
+			<span class="close-modal">&times;</span>
+		</div>
+		<div class="modal-body">
+			<input type="text" class="poke-search" placeholder="Search for a Pokémon...">
+			<div class="search-results"></div>
+		</div>
+	</div>
 </div>
 
 <style>
@@ -111,6 +139,97 @@ require_once 'header.php';
 .teams-table tbody tr:hover {
     background-color: #f5f5f5;
 }
+
+/* Styles for include Pokémon section */
+.include-pokemon-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.include-pokemon-item {
+    display: flex;
+    align-items: center;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    padding: 5px 10px;
+    margin-bottom: 5px;
+}
+
+.include-pokemon-item .name {
+    margin-right: 10px;
+}
+
+.include-pokemon-item .remove {
+    cursor: pointer;
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* Styles for the modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    position: relative;
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 5px;
+    width: 80%;
+    max-width: 500px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.close-modal {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.poke-search {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.search-results {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+}
+
+.search-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.search-item:hover {
+    background-color: #f5f5f5;
+}
 </style>
 
 <?php require_once 'modules/search-string-help.php'; ?>
@@ -144,6 +263,8 @@ $(document).ready(function() {
 		var interfaceMaster = InterfaceMaster.getInstance();
 		if (interfaceMaster) {
 			interfaceMaster.init();
+			// Initialize the Pokemon selector UI
+			interfaceMaster.initializePokemonSelector();
 			console.log("InterfaceMaster initialized");
 		}
 	}
