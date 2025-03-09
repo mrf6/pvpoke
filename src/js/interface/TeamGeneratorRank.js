@@ -5,6 +5,12 @@ var InterfaceMaster = (function () {
         var object = new interfaceObject();
 
 		function interfaceObject(){
+			// Constants for common values
+			const POKEMON_TYPES = ["Bug","Dark","Dragon","Electric","Fairy","Fighting","Fire","Flying","Ghost","Grass","Ground","Ice","Normal","Poison","Psychic","Rock","Steel","Water"];
+			const DEFAULT_SHIELD_MODE = "average";
+			const DEFAULT_SHIELD_COUNT = 1;
+			const DEFAULT_SCORECARD_COUNT = 20;
+			
 			var gm;
 			var battle;
 			var results; // Store team matchup results for later reference
@@ -16,18 +22,80 @@ var InterfaceMaster = (function () {
 
 			this.context = "team";
 
+			// Initialize the interface
 			this.init = function(){
 				gm = GameMaster.getInstance();
 				battle = new Battle();
 			};
+			
+			// Helper function to configure battle settings
+			function configureBattle() {
+				// Set up battle parameters using selected format
+				var formatValue = $(".format-select").val();
+				var cupValue = $(".format-select option:selected").attr("cup") || "all";
+				var cp = parseInt(formatValue) || 1500;
+				
+				battle.setCP(cp);
+				battle.setCup(cupValue);
+				
+				console.log("Using format: CP " + cp + ", Cup: " + cupValue);
+				
+				return { cp, cupValue };
+			}
+			
+			// Helper function to setup shield and battle settings
+			function setupBattleSettings(baitShields) {
+				var shieldMode = DEFAULT_SHIELD_MODE;
+				var shieldCount = DEFAULT_SHIELD_COUNT;
+				
+				if(shieldMode != "average"){
+					shieldCount = parseInt(shieldMode);
+					shieldMode = "single";
+				}
+				
+				var teamSettings = getDefaultMultiBattleSettings();
+				var opponentSettings = getDefaultMultiBattleSettings();
+				
+				teamSettings.shields = opponentSettings.shields = shieldCount;
+				teamSettings.bait = opponentSettings.bait = baitShields;
+				
+				var ranker = RankerMaster.getInstance();
+				ranker.setShieldMode(shieldMode);
+				ranker.applySettings(teamSettings, 0);
+				ranker.applySettings(opponentSettings, 1);
+				ranker.setRecommendMoveUsage(true);
+				
+				return { 
+					ranker, 
+					shieldMode, 
+					shieldCount, 
+					teamSettings, 
+					opponentSettings 
+				};
+			}
+			
+			// Create default team
+			function createDefaultTeam(battle) {
+				var team = [];
+				// Default Pokemon with recommended movesets
+				var defaultPokemon = ["azumarill", "medicham", "skarmory"];
+				
+				for(var i = 0; i < defaultPokemon.length; i++) {
+					var poke = new Pokemon(defaultPokemon[i], 0, battle);
+					poke.initialize(battle.getCP());
+					poke.selectRecommendedMoveset("overall");
+					team.push(poke);
+				}
+				
+				return team;
+			}
 
-			// Add a method to calculate team effectiveness
+			// Primary function to calculate team effectiveness and display results
 			this.calculateTeamEffectiveness = function() {
 				console.log("Calculating team effectiveness");
 
 				// Initialize variables
-				var histograms = [];
-				var scorecardCount = 20; // Default value for scorecard length
+				var scorecardCount = DEFAULT_SCORECARD_COUNT;
 				var allowShadows = true;
 				var allowXL = true;
 				var baitShields = true;
@@ -35,26 +103,22 @@ var InterfaceMaster = (function () {
 				// Hide error message
 				$(".section.error").hide();
 
-				// Get team and validate results
+				// Get team and validate results (empty team will be populated with defaults later)
 				var team = []; // MANUALLY SET TEAM IN THE CODE
-				var gm = GameMaster.getInstance();
-				var battle = new Battle();
 				
-				// Set up battle parameters
-				battle.setCP(1500); // Set to Great League by default, can be changed
-				battle.setCup("all"); // Set cup to "all" by default, can be changed
-
+				// Setup battle
+				configureBattle();
+				
 				// Make sure ranking data is loaded for recommended movesets
 				var key = battle.getCup().name + "overall" + battle.getCP();
 				if (!gm.rankings[key]) {
 					// Instead of returning false, store a reference to this for callback
-					var self = this;
 					gm.loadRankingData({
 						displayRankingData: function() {
-							console.log("Ranking data loaded, continuing team calculation");
-							// Continue team calculation from here
-							self.continueTeamCalculation(team, battle, gm, histograms, scorecardCount, allowShadows, allowXL, baitShields);
-							// Reset the button text now that calculation is complete
+							console.log("Ranking data loaded, analyzing team");
+							// Now that data is loaded, perform the team analysis
+							performTeamAnalysis(team, scorecardCount, baitShields);
+							// Reset the button text 
 							$(".generate-rankings-btn .btn-label").html("Generate Rankings");
 						}
 					}, "overall", battle.getCP(), battle.getCup().name);
@@ -63,377 +127,290 @@ var InterfaceMaster = (function () {
 				}
 
 				// If ranking data is already loaded, continue directly
-				return this.continueTeamCalculation(team, battle, gm, histograms, scorecardCount, allowShadows, allowXL, baitShields);
+				return performTeamAnalysis(team, scorecardCount, baitShields);
 			}
 
-			// Split out the rest of the calculation into a separate function
-			this.continueTeamCalculation = function(team, battle, gm, histograms, scorecardCount, allowShadows, allowXL, baitShields) {
-				// Manually add three Pokémon to the team with recommended movesets
+			// Add a new function to evaluate all possible teams
+			this.evaluateAllTeams = function() {
+				console.log("Starting evaluation of all possible teams");
 				
-				// Pokemon 1: Azumarill
-				var poke1 = new Pokemon("wigglytuff", 0, battle);
-				poke1.initialize(battle.getCP());
-				poke1.selectRecommendedMoveset("overall"); // Use recommended moveset
-				team.push(poke1);
+				// Update button text to show processing
+				$(".evaluate-all-teams-btn .btn-label").html("Processing (this may take a while)...");
 				
-				// Pokemon 2: Medicham
-				var poke2 = new Pokemon("dusclops", 0, battle);
-				poke2.initialize(battle.getCP());
-				poke2.selectRecommendedMoveset("overall"); // Use recommended moveset
-				team.push(poke2);
+				// Initialize variables
+				var scorecardCount = DEFAULT_SCORECARD_COUNT;
+				var allowShadows = true;
+				var allowXL = true;
+				var baitShields = true;
 				
-				// Pokemon 3: Skarmory
-				var poke3 = new Pokemon("furret", 0, battle);
-				poke3.initialize(battle.getCP());
-				poke3.selectRecommendedMoveset("overall"); // Use recommended moveset
-				team.push(poke3);
-
-				if(team.length == 0){
-					$(".section.error").show();
+				// Setup battle
+				configureBattle();
+				
+				// Make sure ranking data is loaded
+				var key = battle.getCup().name + "overall" + battle.getCP();
+				if (!gm.rankings[key]) {
+					// Load ranking data first, then continue
+					gm.loadRankingData({
+						displayRankingData: function() {
+							console.log("Ranking data loaded, starting team evaluation");
+							self.continueAllTeamsEvaluation(battle, gm, scorecardCount, allowShadows, allowXL, baitShields);
+						}
+					}, "overall", battle.getCP(), battle.getCup().name);
+					console.log("Loading ranking data first");
 					return false;
 				}
-
-				// Process defensive and offensive matchups
-				var defenseArr = [];
-				var offenseArr = [];
-
-				for(var i = 0; i < team.length; i++){
-					var poke = team[i];
-
-					defenseArr.push(
-						{
-							name: poke.speciesName,
-							type: poke.types[0],
-							matchups: this.getTypeEffectivenessArray(poke.types, "defense")
-						});
-
-					// Gather offensive matchups for fast move
-					offenseArr.push(
-						{
-							name: poke.fastMove.name,
-							type: poke.fastMove.type,
-							matchups: this.getTypeEffectivenessArray([poke.fastMove.type], "offense")
-						});
-
-					// Gather offensive matchups for all charged moves
-					for(var n = 0; n < poke.chargedMoves.length; n++){
-						offenseArr.push(
-							{
-								name: poke.chargedMoves[n].name,
-								type: poke.chargedMoves[n].type,
-								matchups: this.getTypeEffectivenessArray([poke.chargedMoves[n].type], "offense")
-							});
-					}
-				}
-
-				// Display data
+				
+				// If ranking data is already loaded, continue directly
+				return this.continueAllTeamsEvaluation(battle, gm, scorecardCount, allowShadows, allowXL, baitShields);
+			}
+			
+			// Process all possible teams once ranking data is loaded
+			this.continueAllTeamsEvaluation = function(battle, gm, scorecardCount, allowShadows, allowXL, baitShields) {
+				console.log("Continuing evaluation of all possible teams");
+				
+				// Show processing information
 				$(".typings").show();
-
-				this.displayArray(defenseArr, "defense");
-				this.displayArray(offenseArr, "offense");
-				this.generateSummaries(defenseArr, offenseArr);
-
-				// Generate counters and display
-				var shieldMode = "average";
-				var shieldCount = 1;
-
-				if(shieldMode != "average"){
-					shieldCount = parseInt(shieldMode);
-					shieldMode = "single";
-				}
-
-				var teamSettings = getDefaultMultiBattleSettings();
-				var opponentSettings = getDefaultMultiBattleSettings();
-
-				teamSettings.shields = opponentSettings.shields = shieldCount;
-				teamSettings.bait = opponentSettings.bait = baitShields;
-
-				var ranker = RankerMaster.getInstance();
-				ranker.setShieldMode(shieldMode);
-				ranker.applySettings(teamSettings, 0);
-				ranker.applySettings(opponentSettings, 1);
-
-				// IMPORTANT: Set recommended movesets to be used for ALL Pokémon in the rankings
-				ranker.setRecommendMoveUsage(true);
-
-				// Rank team against potential threats
-				// This will use recommended movesets for all opponent Pokémon in the analysis
-				var data = ranker.rank(team, battle.getCP(), battle.getCup(), [], "team-counters");
-				var counterRankings = data.rankings;
-				var teamRatings = data.teamRatings;
-				counterTeam = [];
-
-				results = counterRankings;
-
-				// For each Pokemon in the rankings, ensure it has the recommended moveset
-				for(var i = 0; i < counterRankings.length; i++){
-					var pokemon = counterRankings[i].pokemon;
+				$(".section.typings .rankings-container").html('<div class="processing-message"><p>Processing all possible teams. This may take several minutes...</p><div class="progress-container"><div class="progress-bar"></div></div><p class="progress-text">0% complete</p><p class="teams-processed">0 teams processed</p></div>');
+				
+				// Get the top 50 Pokémon from rankings
+				var key = battle.getCup().name + "overall" + battle.getCP();
+				var rankings = gm.rankings[key];
+				var topPokemon = [];
+				var teamResults = [];
+				var totalProcessed = 0;
+				
+				// Get the top 50 Pokémon (or less if not available)
+				var numToGet = Math.min(20, rankings.length);
+				for (var i = 0; i < numToGet; i++) {
+					var pokeData = rankings[i];
 					
-					// Reset and select recommended moveset to be absolutely certain
-					pokemon.resetMoves();
-					pokemon.selectRecommendedMoveset("overall");
+					// Add to our list of top Pokémon
+					topPokemon.push(pokeData.speciesId);
 				}
-
-				// Double-check team Pokémon have their recommended movesets
-				for(var i = 0; i < team.length; i++){
-					team[i].resetMoves();
-					team[i].selectRecommendedMoveset("overall");
-				}
-
-				// Potential threats
-				var csv = ','; // CSV data of all matchups
-				$(".section.typings .rankings-container").html('');
-				$(".threats-table").html("");
-				$(".meta-table").html("");
-
-				var $row = $("<thead><tr><td></td></tr></thead>");
-
-				for(var n = 0; n < team.length; n++){
-					$row.find("tr").append("<td class=\"name-small\">"+team[n].speciesName+"</td>");
-
-					csv += team[n].speciesName + ' ' + team[n].generateMovesetStr();
-					if(n < team.length -1){
-						csv += ',';
-					}
-				}
-
-				csv += ',Threat Score,Overall Rating';
-
-				$(".threats-table").append($row);
-				$(".meta-table").append($row.clone());
-				$(".threats-table").append("<tbody></tbody>");
-				$(".meta-table").append("<tbody></tbody>");
-
-				var avgThreatScore = 0;
-				var count = 0;
-				var total = scorecardCount;
-				var excludedThreatIDs = [];
-				var allowShadows = true; // Shadow Pokémon are allowed by default
-
-				var i = 0;
-
-				// Sorting threats by score (this is done by the TeamRanker but we'll do it again to be sure)
-				counterRankings.sort((a,b) => (a.score > b.score) ? -1 : ((b.score > a.score) ? 1 : 0));
-
-				while((count < total) && (i < counterRankings.length)){
-					var r = counterRankings[i];
-
-					// Make sure this threat has recommended moveset
-					r.pokemon.resetMoves();
-					r.pokemon.selectRecommendedMoveset("overall");
-
-					// Filtering logic identical to TeamInterface
-					// Skip shadows if not allowed
-					if((r.speciesId.indexOf("_shadow") > -1) && (!allowShadows)){
-						i++;
-						continue;
-					}
-
-					// Skip XS forms
-					if(r.speciesId.indexOf("_xs") > -1){
-						i++;
-						continue;
-					}
-
-					// Skip Pokémon with teambuilderexclude tag
-					if(r.pokemon.hasTag("teambuilderexclude")){
-						i++;
-						continue;
-					}
-
-					// Skip Pokémon in the excluded IDs list
-					if(excludedThreatIDs.indexOf(r.speciesId) > -1){
-						i++;
-						continue;
-					}
-
-					var pokemon = r.pokemon;
-
-					// Display threat score
-					if(count < 20){
-						avgThreatScore += r.score;
-					}
-
-					// Push to counter team
-					if(count < 6){
-						counterTeam.push(pokemon);
-					}
-
-					// Add results to threats table
-					$row = $("<tr><th class=\"name\"><b>"+(count+1)+". "+pokemon.speciesName+"</b></th></tr>");
-
-					for(var n = 0; n < r.matchups.length; n++){
-						var $cell = $("<td><a class=\"rating\" href=\"#\" target=\"blank\"><span></span></a></td>");
-						var rating = r.matchups[n].rating;
-
-						$cell.find("a").addClass(battle.getRatingClass(rating));
-
-						// Make sure both Pokémon have recommended movesets before generating battle link
-						pokemon.resetMoves();
-						pokemon.selectRecommendedMoveset("overall");
+				
+				console.log("Using top " + topPokemon.length + " Pokémon to generate teams");
+				
+				// Generate all possible 3-Pokémon combinations
+				var combinations = this.generateCombinations(topPokemon, 3);
+				console.log("Generated " + combinations.length + " possible team combinations");
+				
+				// Calculate total number of combinations
+				var totalCombinations = combinations.length;
+				var batchSize = 20; // Increased batch size for performance
+				var batchIndex = 0;
+				
+				// Function to process teams in batches to prevent UI freezing
+				var processNextBatch = function() {
+					// Get the next batch of teams to process
+					var endIndex = Math.min(batchIndex + batchSize, totalCombinations);
+					
+					// Process each team in the current batch
+					for (var i = batchIndex; i < endIndex; i++) {
+						var teamSpeciesIds = combinations[i];
+						var team = [];
+						var pokemonNames = []; // Store just the names for display
 						
-						r.matchups[n].opponent.resetMoves();
-						r.matchups[n].opponent.selectRecommendedMoveset("overall");
-
-						if(!baitShields){
-							pokemon.isCustom = true;
-							pokemon.baitShields = 0;
-							r.matchups[n].opponent.isCustom = true;
-							r.matchups[n].opponent.baitShields = 0;
+						// Create Pokémon objects for the team
+						for (var j = 0; j < teamSpeciesIds.length; j++) {
+							var pokemon = new Pokemon(teamSpeciesIds[j], 0, battle);
+							pokemon.initialize(battle.getCP());
+							pokemon.selectRecommendedMoveset("overall");
+							team.push(pokemon);
+							pokemonNames.push(pokemon.speciesName); // Store just the name
 						}
-
-						var pokeStr = pokemon.generateURLPokeStr();
-						var moveStr = pokemon.generateURLMoveStr();
-						var opPokeStr = r.matchups[n].opponent.generateURLPokeStr();
-						var opMoveStr = r.matchups[n].opponent.generateURLMoveStr();
-						var shieldStr = shieldCount + "" + shieldCount;
-						var battleLink = host+"battle/"+battle.getCP(true)+"/"+pokeStr+"/"+opPokeStr+"/"+shieldStr+"/"+moveStr+"/"+opMoveStr+"/";
-						$cell.find("a").attr("href", battleLink);
-
-						$row.append($cell);
+						
+						// Generate team rankings - streamlined calculation
+						var teamData = calculateTeamRankings(team, battle, baitShields);
+						
+						// Calculate the threat score from the rankings
+						var score = calculateTeamThreatScore(teamData.rankings);
+						
+						// Add result to the list - only store names and score, not entire Pokémon objects
+						teamResults.push({
+							pokemonNames: pokemonNames,
+							threatScore: score
+						});
+						
+						// Free memory by explicitly clearing these variables
+						team = null;
+						teamData = null;
+						
+						totalProcessed++;
 					}
-
-					i++;
-					count++;
-
-					$(".threats-table tbody").append($row);
-				}
-
-				// Display average threat score
-				avgThreatScore = Math.round(avgThreatScore / 20);
-				$(".threat-score").html(avgThreatScore);
-
-				// Update page title with team name
-				var teamNameStr = team[0].speciesName;
-				var i = 1;
-
-				for(i = 1; i < Math.min(team.length, 3); i++){
-					teamNameStr += ", " + team[i].speciesName;
-				}
-
-				if(i < team.length){
-					teamNameStr += "+" + (team.length - i);
-				}
-
-				document.title = teamNameStr + " - Team Generator | PvPoke";
-
-				// Set share link
-				var cupStr = battle.getCup().name;
-				var link = host + "team-generator/";
-
-				$(".share-link input").val(link);
+					
+					// Update progress
+					var percentComplete = Math.floor((totalProcessed / totalCombinations) * 100);
+					$(".progress-bar").css("width", percentComplete + "%");
+					$(".progress-text").text(percentComplete + "% complete");
+					$(".teams-processed").text(totalProcessed + " of " + totalCombinations + " teams processed");
+					
+					// Continue processing if not done
+					batchIndex = endIndex;
+					if (batchIndex < totalCombinations) {
+						setTimeout(processNextBatch, 0); // Allow UI to update
+					} else {
+						// All teams processed, display results
+						displayResults();
+					}
+				};
+				
+				// Function to display the final results - simplified to just show teams and scores
+				var displayResults = function() {
+					console.log("All teams processed, displaying results");
+					
+					// Sort teams by threat score (lowest to highest)
+					teamResults.sort(function(a, b) {
+						return a.threatScore - b.threatScore;
+					});
+					
+					// Display the top 100 teams
+					var numToShow = Math.min(100, teamResults.length);
+					var html = '<h3>Top ' + numToShow + ' Teams (Lowest Threat Score)</h3>';
+					html += '<table class="teams-table rating-table" cellspacing="0">';
+					html += '<thead><tr><th>Rank</th><th>Team</th><th>Threat Score</th></tr></thead><tbody>';
+					
+					for (var i = 0; i < numToShow; i++) {
+						var result = teamResults[i];
+						var teamStr = result.pokemonNames.join(', ');
+						
+						html += '<tr>';
+						html += '<td>' + (i + 1) + '</td>';
+						html += '<td>' + teamStr + '</td>';
+						html += '<td>' + result.threatScore + '</td>';
+						html += '</tr>';
+					}
+					
+					html += '</tbody></table>';
+					
+					// Display results - no fancy interactive analysis
+					$(".section.typings .rankings-container").html(html);
+					
+					// Reset button text
+					$(".generate-rankings-btn .btn-label").html("Generate Rankings");
+					
+					// Try to free some memory
+					combinations = null;
+					teamResults = teamResults.slice(0, numToShow);
+				};
+				
+				// Start processing teams
+				processNextBatch();
 				
 				return true;
 			}
-
-
-			// Display array of Pokemon matchups
-			this.displayArray = function(arr, direction){
-				var $container = $("."+direction);
-				$container.html("");
-
-				// Generate type headers
-				var types = this.getAllTypes();
-				var $row = $("<div class=\"type-row header\"></div>");
-
-				for(var i = 0; i < types.length; i++){
-					$row.append("<div class=\"type-container\"><div class=\"type " + types[i].toLowerCase() + "\">" + types[i] + "</div></div>");
-				}
-
-				$container.append($row);
-
-				// Generate arr rows
-				for(var i = 0; i < arr.length; i++){
-					var obj = arr[i];
-					var effectiveness = obj.matchups;
-
-					$row = $("<div class=\"type-row\"><div class=\"name-container\"><span>" + obj.name + "</span><div class=\"type " + obj.type.toLowerCase() + "\">" + obj.type + "</div></div></div>");
-
-					// Add individual type cells
-					for(var n = 0; n < types.length; n++){
-						var $cell = $("<div class=\"type-container\"></div>");
-						var effectivenessValue = effectiveness[n];
-						var effectivenessClass = "";
-						var effectivenessLabel = "x" + effectivenessValue;
-
-						if(effectivenessValue > 1){
-							effectivenessClass = "se";
-
-							if(effectivenessValue >= 2.5){
-								effectivenessClass = "se se-4";
-							} else if(effectivenessValue >= 2){
-								effectivenessClass = "se se-3";
-							} else if(effectivenessValue >= 1.6){
-								effectivenessClass = "se se-2";
-							}
-						} else if(effectivenessValue < 1){
-							effectivenessClass = "nve";
-
-							if(effectivenessValue <= 0.39){
-								effectivenessClass = "nve nve-4";
-							} else if(effectivenessValue <= 0.5){
-								effectivenessClass = "nve nve-3";
-							} else if(effectivenessValue <= 0.625){
-								effectivenessClass = "nve nve-2";
-							}
-						}
-
-						if(parseFloat(effectivenessValue) == 0){
-							effectivenessClass = "immune";
-							effectivenessLabel = "x0";
-						}
-
-						$cell.append("<div class=\"type-effectiveness " + effectivenessClass + "\">" + effectivenessLabel + "</div>");
-						$row.append($cell);
-					}
-
-					$container.append($row);
-				}
-			}
-
-			// Generate summaries of a team's typing matchups
-			this.generateSummaries = function(defenseArr, offenseArr){
-				var defSummary = [];
-				var offSummary = [];
-
-				defSummary = this.generateTypeSummary(defenseArr, defSummary, "defense");
-				offSummary = this.generateTypeSummary(offenseArr, offSummary, "offense");
+			
+			// Generate all possible combinations of size k from an array
+			this.generateCombinations = function(arr, k) {
+				var combinations = [];
 				
-				$(".defense-summary").html("");
-				$(".offense-summary").html("");
-
-				for(var i = 0; i < defSummary.length; i++){
-					$(".defense-summary").append("<div class=\"summary-item\">"+defSummary[i]+"</div>");
+				// Helper function for recursive combination generation
+				function generate(prefix, arr, k, start) {
+					if (k === 0) {
+						combinations.push(prefix.slice());
+						return;
+					}
+					
+					for (var i = start; i <= arr.length - k; i++) {
+						prefix.push(arr[i]);
+						generate(prefix, arr, k - 1, i + 1);
+						prefix.pop();
+					}
 				}
-
-				for(var i = 0; i < offSummary.length; i++){
-					$(".offense-summary").append("<div class=\"summary-item\">"+offSummary[i]+"</div>");
-				}
+				
+				generate([], arr, k, 0);
+				return combinations;
 			}
+			
+			// Centralized function to calculate team rankings - used by multiple functions
+			function calculateTeamRankings(team, battle, baitShields) {
+				// Setup battle settings
+				var battleConfig = setupBattleSettings(baitShields);
+				var ranker = battleConfig.ranker;
+				
+				// Rank team against potential threats
+				var data = ranker.rank(team, battle.getCP(), battle.getCup(), [], "team-counters");
+				
+				// Sort rankings by score descending
+				data.rankings.sort((a,b) => (a.score > b.score) ? -1 : ((b.score > a.score) ? 1 : 0));
+				
+				return {
+					rankings: data.rankings,
+					battleConfig: battleConfig
+				};
+			}
+			
+			// Calculate threat score for a specific team
+			function calculateTeamThreatScore(rankings) {
+				// Calculate average threat score from top 20 threats
+				var avgThreatScore = 0;
+				var count = Math.min(DEFAULT_SCORECARD_COUNT, rankings.length);
+				
+				for (var i = 0; i < count; i++) {
+					avgThreatScore += rankings[i].score;
+				}
+				
+				return Math.round(avgThreatScore / count);
+			}
+			
+			// Main function to handle team analysis
+			function performTeamAnalysis(team, scorecardCount, baitShields) {
+				// If team is empty, create the default team
+				if (team.length === 0) {
+					team = createDefaultTeam(battle);
+				}
+				
+				if(team.length === 0){
+					$(".section.error").show();
+					return false;
+				}
+				
+				// Calculate team rankings only once
+				var teamData = calculateTeamRankings(team, battle, baitShields);
+				var counterRankings = teamData.rankings;
+				
+				// Calculate and display threat score only - no detailed analysis
+				var avgThreatScore = calculateTeamThreatScore(counterRankings);
+				
+				// Update page title with team name
+				var teamNameStr = team[0].speciesName;
+				var i = 1;
+				
+				for(i = 1; i < Math.min(team.length, 3); i++){
+					teamNameStr += ", " + team[i].speciesName;
+				}
+				
+				if(i < team.length){
+					teamNameStr += "+" + (team.length - i);
+				}
+				
+				// Display only the threat score
+				$(".typings").show();
+				$(".section.typings .rankings-container").html('<p>Team Threat Score: ' + avgThreatScore + '</p>');
+				
+				document.title = teamNameStr + " - Team Generator | PvPoke";
+				
+				return true;
+			}
+			
 
 			// Given a subject type, produce effectiveness array for offense or defense
 			this.getTypeEffectivenessArray = function(subjectTypes, direction){
 				var arr = [];
 				var battle = new Battle();
-				var allTypes = this.getAllTypes();
 
-				for(var n = 0; n < allTypes.length; n++){
-
+				for(var n = 0; n < POKEMON_TYPES.length; n++){
+					var effectiveness;
+					var typeToCheck = POKEMON_TYPES[n];
+					
 					if(direction == "offense"){
-						var effectiveness = battle.getEffectiveness(subjectTypes[0], [allTypes[n]]);
-
-						// Round to nearest thousandths to avoid Javascript floating point wonkiness
-						effectiveness = Math.floor(effectiveness * 1000) / 1000;
-
-						arr.push(effectiveness);
+						effectiveness = battle.getEffectiveness(subjectTypes[0], [typeToCheck]);
 					} else if(direction == "defense"){
-						effectiveness = battle.getEffectiveness(allTypes[n], subjectTypes);
-
-						// Round to nearest thousandths to avoid Javascript floating point wonkiness
-						effectiveness = Math.floor(effectiveness * 1000) / 1000;
-
-						arr.push(effectiveness);
+						effectiveness = battle.getEffectiveness(typeToCheck, subjectTypes);
 					}
+
+					// Round to nearest thousandths to avoid Javascript floating point wonkiness
+					effectiveness = Math.floor(effectiveness * 1000) / 1000;
+					arr.push(effectiveness);
 				}
 
 				return arr;
@@ -441,134 +418,9 @@ var InterfaceMaster = (function () {
 
 			// Array of all types
 			this.getAllTypes = function(){
-				var types = ["Bug","Dark","Dragon","Electric","Fairy","Fighting","Fire","Flying","Ghost","Grass","Ground","Ice","Normal","Poison","Psychic","Rock","Steel","Water"];
-
-				return types;
+				return POKEMON_TYPES.slice(); // Return a copy to prevent modification
 			}
-
-			// Return an array of descriptions given an array of type effectiveness, and a flag for offense or defense
-			this.generateTypeSummary = function(arr, sumArr, direction){
-				var typesResistedArr = [];
-				var typesWeakArr = [];
-				var typesNeutralOrBetter = []; // Array of types that can be hit for neutral damage or better
-				var productArr = []; // Product of resistances across all Pokemon
-
-				var allTypes = this.getAllTypes();
-
-				for(var i = 0; i < allTypes.length; i++){
-					typesResistedArr.push(0);
-					typesWeakArr.push(0);
-					typesNeutralOrBetter.push(0);
-					productArr.push(1);
-				}
-
-				for(var i = 0; i < arr.length; i++){
-					var obj = arr[i];
-
-					for(var n = 0; n < obj.matchups.length; n++){
-
-						if(obj.matchups[n] < 1){
-							typesResistedArr[n] = 1;
-						} else if (obj.matchups[n] > 1){
-							typesWeakArr[n] = 1;
-						}
-
-						if(obj.matchups[n] >= 1){
-							typesNeutralOrBetter[n] = 1;
-						}
-
-						productArr[n] *= obj.matchups[n];
-					}
-				}
-				// Produce a final defensive count
-
-				var typesResisted = 0;
-				var typesWeak = 0;
-				var overallStrengths = [];
-				var overallWeaknesses = [];
-				var overallNoNeutralDamage = [];
-
-				for(var i = 0; i < allTypes.length; i++){
-					if(typesResistedArr[i] == 1){
-						typesResisted++;
-					}
-
-					if(typesWeakArr[i] == 1){
-						typesWeak++;
-					}
-
-					if(typesNeutralOrBetter[i] == 0){
-						overallNoNeutralDamage.push(allTypes[i]);
-					}
-
-					if(productArr[i] < 1){
-						overallStrengths.push(allTypes[i]);
-					} else if(productArr[i] > 1){
-						overallWeaknesses.push(allTypes[i]);
-					}
-				}
-
-				if(direction == "defense"){
-					sumArr.push("This team resists " + typesResisted + " of " + allTypes.length + " types.");
-					sumArr.push("This team is weak to " + typesWeak + " of " + allTypes.length + " types.");
-				} else if(direction == "offense"){
-					sumArr.push("This team can hit " + typesWeak + " of " + allTypes.length + " types super effectively.");
-				}
-
-				var str;
-
-				// On defense show which types are best resisted, and on offense show which types are best hit effectively
-
-				if(overallStrengths.length > 0){
-					if(direction=="defense"){
-						str = this.generateTypeSummaryList(overallStrengths, "Overall, strong against","");
-					} else if(direction=="offense"){
-						str = this.generateTypeSummaryList(overallWeaknesses, "Overall, most effective against","");
-					}
-
-					sumArr.push(str);
-				}
-
-				// On defense, show list of types that hit this team most effectively
-
-				if((overallWeaknesses.length > 0) && (direction == "defense")){
-					str = this.generateTypeSummaryList(overallWeaknesses, "Overall, weak to","");
-
-					sumArr.push(str);
-				}
-
-				// On offense, show list of types that can't be hit with neutral or better damage
-
-				if((overallNoNeutralDamage.length > 0) && (direction == "offense")){
-					str = this.generateTypeSummaryList(overallNoNeutralDamage, "This team can't hit", " for at least neutral damage.");
-
-					sumArr.push(str);
-				}
-
-				return sumArr;
-			}
-
-			// Generate and return a descriptive string given a list of types
-			this.generateTypeSummaryList = function(arr, beforeStr, afterStr){
-				var str = beforeStr;
-
-				for(var i = 0; i < arr.length; i++){
-					if(i > 0){
-						str += ",";
-
-						if((i == arr.length - 1) && (i > 1)){
-							str += " and";
-						}
-					}
-
-					str += " <span class=\"" + arr[i].toLowerCase() + "\">" + arr[i] + "</span>";
-				}
-
-				str += afterStr;
-
-				return str;
-			}
-		}
+        }
 
         return object;
     }

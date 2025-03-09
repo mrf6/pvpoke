@@ -18,10 +18,16 @@ require_once 'header.php';
 </div>
 
 <div class="button-container">
-	<button class="generate-rankings-btn button">
+	<!-- <button class="generate-rankings-btn button">
 		<span class="btn-content-wrap">
 			<span class="btn-icon btn-icon-analysis"></span>
 			<span class="btn-label">Generate Rankings</span>
+		</span>
+	</button> -->
+	<button class="evaluate-all-teams-btn button">
+		<span class="btn-content-wrap">
+			<span class="btn-icon btn-icon-analysis"></span>
+			<span class="btn-label">Find Best Teams</span>
 		</span>
 	</button>
 </div>
@@ -31,7 +37,7 @@ require_once 'header.php';
 <?php require 'modules/ads/body-728.php'; ?>
 
 <div class="section typings white">
-	<a href="#" class="toggle active">Potential Threats <span class="arrow-down">&#9660;</span><span class="arrow-up">&#9650;</span></a>
+	<!-- <a href="#" class="toggle active">Potential Threats <span class="arrow-down">&#9660;</span><span class="arrow-up">&#9650;</span></a>
 	<div class="toggle-content article">
 		<p>The Pokemon below have the best overall matchups against this team. Results are taken from 0 and 1 shield simulations. Scores also factor in a Pokemon's overall strength and consistency.</p>
 		<div class="table-container">
@@ -40,16 +46,72 @@ require_once 'header.php';
 		</div>
 		<p class="center">This team has a threat score of <b class="threat-score"></b></p>
 		<p class="small"><strong>Threat score</strong> measures how vulnerable your team may be to specific Pokemon. The smaller the number, the better. It factors in how many Pokemon on your team can be threatened, how hard they're threatened, a threat's overall ranking (how likely you may be to encounter it), and how consistently it performs.</p>
-	</div>
+	</div> -->
+	<div class="rankings-container"></div>
 
-	<div class="share-link-container">
+	<!-- <div class="share-link-container">
 		<p>Share this team:</p>
 		<div class="share-link">
 			<input type="text" value="" readonly>
 			<div class="copy">Copy</div>
 		</div>
-	</div>
+	</div> -->
 </div>
+
+<style>
+/* Styles for progress bar and team evaluation */
+.processing-message {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.progress-container {
+    width: 100%;
+    height: 20px;
+    background-color: #f3f3f3;
+    border-radius: 10px;
+    margin: 15px 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #3498db;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text, .teams-processed {
+    text-align: center;
+    margin: 10px 0;
+}
+
+.teams-table {
+    width: 100%;
+    margin: 20px 0;
+    border-collapse: collapse;
+}
+
+.teams-table th, .teams-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.teams-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.teams-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.teams-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+</style>
 
 <?php require_once 'modules/search-string-help.php'; ?>
 <?php require_once 'modules/search-traits.php'; ?>
@@ -109,6 +171,23 @@ $(document).ready(function() {
 			// Reset button text after calculations complete
 			$(this).find(".btn-label").html("Generate Rankings");
 		}
+	});
+	
+	// Set up the Evaluate All Teams button
+	$(".evaluate-all-teams-btn").on("click", function() {
+		console.log("Evaluate All Teams button clicked");
+		
+		// Hide error message by default
+		$(".section.error").hide();
+		
+		// Display warning with confirm dialog
+		// if (confirm("This will evaluate thousands of team combinations and may take several minutes to complete. Do you want to continue?")) {
+		// 	// Call the evaluate all teams function
+		// }
+
+		var teamGenerator = InterfaceMaster.getInstance();
+		teamGenerator.context = "team-generator";
+		teamGenerator.evaluateAllTeams();
 	});
 	
 	// Copy share link to clipboard
