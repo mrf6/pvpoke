@@ -11,14 +11,15 @@ var InterfaceMaster = (function () {
 			const DEFAULT_SHIELD_COUNT = 1;
 			const DEFAULT_SCORECARD_COUNT = 20;
 			
+			// Global variables
 			var gm;
 			var battle;
             var battleResults;
 			var results; // Store team matchup results for later reference
-			var altRankings; // Store alternatives for searching
-			var counterTeam;
+			var rankingData = null; // Store ranking data centrally
+			var pokemonMap = {}; // Map of Pokémon IDs to names
+			var selectedPokemon = []; // Track selected Pokémon for includes
 			var self = this;
-			var runningResults = false;
 			var host = window.location.hostname;
 
 			this.context = "team";
@@ -27,8 +28,132 @@ var InterfaceMaster = (function () {
 			this.init = function(){
 				gm = GameMaster.getInstance();
 				battle = new Battle();
+				
+				// Initial configuration of battle
+				configureBattle();
+				
+				// Set up event handlers for format changes
+				$(".format-select").on("change", function() {
+					// Clear ranking data when format changes
+					rankingData = null;
+					pokemonMap = {};
+					
+					// Configure battle with new format
+					configureBattle();
+					
+					// Load ranking data for the new format
+					loadRankingData(function() {
+						console.log("Ranking data loaded for new format");
+					});
+				});
+				
+				// Initial load of ranking data
+				loadRankingData(function() {
+					console.log("Initial ranking data loaded");
+				});
 			};
 			
+			// Centralized function to load ranking data
+			function loadRankingData(callback) {
+				if (rankingData !== null) {
+					// Data already loaded, just return it
+					if (callback) callback(rankingData);
+					return;
+				}
+				
+				// Make sure battle is configured
+				if (!battle.getCup() || !battle.getCP()) {
+					configureBattle();
+				}
+				
+				// Get the key for the current format/cup
+				var cupName = battle.getCup() ? battle.getCup().name : "all";
+				var cp = battle.getCP() || 1500;
+				var key = cupName + "overall" + cp;
+				
+				if (!gm.rankings[key]) {
+					// Need to load data from server
+					gm.loadRankingData({
+						displayRankingData: function() {
+							rankingData = gm.rankings[key];
+							
+							// Build Pokémon map for easy lookup
+							buildPokemonMap();
+							
+							if (callback) callback(rankingData);
+						}
+					}, "overall", cp, cupName);
+				} else {
+					// Data already in GameMaster, use it
+					rankingData = gm.rankings[key];
+					
+					// Build Pokémon map for easy lookup
+					buildPokemonMap();
+					
+					if (callback) callback(rankingData);
+				}
+			}
+			
+			// Build map of Pokémon IDs to names for easier lookup
+			function buildPokemonMap() {
+				pokemonMap = {};
+				
+				if (!rankingData) return;
+				
+				for (var i = 0; i < rankingData.length; i++) {
+					var pokemon = rankingData[i];
+					pokemonMap[pokemon.speciesId] = pokemon.speciesName;
+				}
+			}
+			
+			// Helper function to configure battle settings
+			function configureBattle() {
+				// Set up battle parameters using selected format
+				var formatValue = $(".format-select").val();
+				var cupValue = $(".format-select option:selected").attr("cup") || "all";
+				var cp = parseInt(formatValue) || 1500;
+				
+				// Make sure battle is initialized
+				if (!battle) {
+					battle = new Battle();
+				}
+				
+				battle.setCP(cp);
+				battle.setCup(cupValue);
+				
+				console.log("Configured battle: CP " + cp + ", Cup: " + cupValue);
+				
+				return { cp, cupValue };
+			}
+			
+			// Get top Pokémon and all Pokémon from ranking data
+			function getPokemonLists(battleCount, teamCount) {
+                battleCount = battleCount || 150; // Use top 150 for all battles
+				teamCount = teamCount || 100; // Build teams from top 100
+				
+				var battlePokemon = [];
+				var teamPokemon = [];
+				
+				if (!rankingData) {
+					console.error("Ranking data not loaded");
+					return { battlePokemon, teamPokemon };
+				}
+				
+				for (var i = 0; i < rankingData.length; i++) {
+					var speciesId = rankingData[i].speciesId;
+                    
+                    if (i < battleCount) {
+                        battlePokemon.push(speciesId);
+                    }
+					
+					if (i < teamCount) {
+						teamPokemon.push(speciesId);
+					}
+				}
+				
+				return { battlePokemon, teamPokemon };
+			}
+            
             // Main function to evaluate all teams - This will be called from the button
             this.evaluateAllTeams = function() {
                 console.log("Starting evaluation of all possible teams");
@@ -36,46 +161,42 @@ var InterfaceMaster = (function () {
                 // Update button text to show processing
                 $(".evaluate-all-teams-btn .btn-label").html("Processing (this may take a while)...");
                 
-                // Setup battle
-                var formatValue = $(".format-select").val();
-                var cupValue = $(".format-select option:selected").attr("cup") || "all";
-                var cp = parseInt(formatValue) || 1500;
+                // Show a loading message while we load the data
+                $(".typings").show();
+                $(".section.typings .rankings-container").html('<div class="processing-message"><p>Loading Pokémon data...</p></div>');
                 
-                battle.setCP(cp);
-                battle.setCup(cupValue);
-                
-                // Make sure ranking data is loaded
-                var key = battle.getCup().name + "overall" + battle.getCP();
-                if (!gm.rankings[key]) {
-                    // Load ranking data first, then continue
-                    gm.loadRankingData({
-                        displayRankingData: function() {
-                            console.log("Ranking data loaded, starting team evaluation");
-                            runTeamEvaluation();
-                        }
-                    }, "overall", battle.getCP(), battle.getCup().name);
-                    console.log("Loading ranking data first");
-                    return false;
+                // Make sure battle is configured
+                if (!battle.getCup() || !battle.getCP()) {
+                    configureBattle();
                 }
                 
-                // If ranking data is already loaded, continue directly
-                return runTeamEvaluation();
+                // Make sure ranking data is loaded
+                loadRankingData(function() {
+                    // Once data is loaded, run the team evaluation
+                    if (!rankingData || !rankingData.length) {
+                        // Show error if we couldn't load data
+                        $(".section.typings .rankings-container").html('<div class="error-message"><p>Error: Could not load Pokémon ranking data. Please try again.</p></div>');
+                        $(".evaluate-all-teams-btn .btn-label").html("Find Best Teams");
+                        return;
+                    }
+                    
+                    // Data is loaded, proceed with evaluation
+                    runTeamEvaluation();
+                });
+                
+                return true;
             };
             
             // Set up the Pokémon selection UI
             this.initializePokemonSelector = function() {
-                var self = this;
-                var includeList = []; // Store the selected Pokémon IDs
-                var pokemonData = {}; // Store mapping of Pokémon IDs to names
-                
                 // Function to render the include list
                 function renderIncludeList() {
                     var $list = $(".include-pokemon-list");
                     $list.empty();
                     
-                    for (var i = 0; i < includeList.length; i++) {
-                        var pokemonId = includeList[i];
-                        var displayName = pokemonData[pokemonId] || pokemonId;
+                    for (var i = 0; i < selectedPokemon.length; i++) {
+                        var pokemonId = selectedPokemon[i];
+                        var displayName = pokemonMap[pokemonId] || pokemonId;
                         
                         var $item = $('<div class="include-pokemon-item" data-id="' + pokemonId + '">' + 
                                       '<span class="name">' + displayName + '</span>' + 
@@ -86,46 +207,17 @@ var InterfaceMaster = (function () {
                     }
                     
                     // Show/hide add button based on current selection count
-                    if (includeList.length >= 3) {
+                    if (selectedPokemon.length >= 3) {
                         $(".add-include-btn").hide();
                     } else {
                         $(".add-include-btn").show();
                     }
                 }
                 
-                // Load Pokémon data for autocomplete
-                function loadPokemonData(callback) {
-                    var formatValue = $(".format-select").val();
-                    var cupValue = $(".format-select option:selected").attr("cup") || "all";
-                    var cp = parseInt(formatValue) || 1500;
-                    
-                    battle.setCP(cp);
-                    battle.setCup(cupValue);
-                    
-                    var key = battle.getCup().name + "overall" + battle.getCP();
-                    
-                    if (!gm.rankings[key]) {
-                        gm.loadRankingData({
-                            displayRankingData: function() {
-                                var rankings = gm.rankings[key];
-                                for (var i = 0; i < rankings.length; i++) {
-                                    pokemonData[rankings[i].speciesId] = rankings[i].speciesName;
-                                }
-                                callback();
-                            }
-                        }, "overall", battle.getCP(), battle.getCup().name);
-                    } else {
-                        var rankings = gm.rankings[key];
-                        for (var i = 0; i < rankings.length; i++) {
-                            pokemonData[rankings[i].speciesId] = rankings[i].speciesName;
-                        }
-                        callback();
-                    }
-                }
-                
                 // Handle the Add Pokémon button click
                 $(".add-include-btn").on("click", function() {
-                    loadPokemonData(function() {
+                    // Make sure data is loaded before showing modal
+                    loadRankingData(function() {
                         // Show the modal
                         $(".include-search-modal").css("display", "block");
                         
@@ -158,8 +250,8 @@ var InterfaceMaster = (function () {
                     var matches = [];
                     
                     // Search by ID and name
-                    for (var id in pokemonData) {
-                        var name = pokemonData[id];
+                    for (var id in pokemonMap) {
+                        var name = pokemonMap[id];
                         
                         if (id.toLowerCase().includes(query) || name.toLowerCase().includes(query)) {
                             matches.push({
@@ -185,8 +277,8 @@ var InterfaceMaster = (function () {
                     var pokemonId = $(this).data("id");
                     
                     // Don't add duplicates
-                    if (includeList.indexOf(pokemonId) === -1) {
-                        includeList.push(pokemonId);
+                    if (selectedPokemon.indexOf(pokemonId) === -1) {
+                        selectedPokemon.push(pokemonId);
                         renderIncludeList();
                     }
                     
@@ -202,60 +294,75 @@ var InterfaceMaster = (function () {
                     var pokemonId = $item.data("id");
                     
                     // Remove from the list
-                    includeList = includeList.filter(function(id) {
+                    selectedPokemon = selectedPokemon.filter(function(id) {
                         return id !== pokemonId;
                     });
                     
                     renderIncludeList();
                 });
                 
-                // Method to get the current include list
-                this.getIncludeList = function() {
-                    return includeList;
-                };
-                
                 // Initialize the UI
                 renderIncludeList();
             };
-            
+
             // Main function that runs the team evaluation process
             function runTeamEvaluation() {
+                // Make sure we have ranking data
+                if (!rankingData || !rankingData.length) {
+                    console.error("Cannot run team evaluation: Ranking data not loaded");
+                    $(".section.typings .rankings-container").html('<div class="error-message"><p>Error: Pokémon data not available.</p></div>');
+                    $(".evaluate-all-teams-btn .btn-label").html("Find Best Teams");
+                    return false;
+                }
+                
                 // Show processing information
                 $(".typings").show();
                 $(".section.typings .rankings-container").html('<div class="processing-message"><p>Processing all possible teams. This may take several minutes...</p><div class="progress-container"><div class="progress-bar"></div></div><p class="progress-text">0% complete</p><p class="teams-processed">0 teams processed</p></div>');
                 
-                // Get all Pokémon data
-                var battleRange = 150; // Only consider top 150 for battles
-                var teamRange = 100; // Use top 100 for team generation
-                var pokemonData = getAllPokemon(gm, battleRange, teamRange);
-                var allPokemon = pokemonData.allPokemon;
-                var topPokemon = pokemonData.topPokemon;
+                // Get Pokémon lists from ranking data
+                var pokemonLists = getPokemonLists(50, 50);
+                var battlePokemon = pokemonLists.battlePokemon;
+                var teamPokemon = pokemonLists.teamPokemon;
                 
-                console.log("Using top " + topPokemon.length + " Pokémon to generate teams");
+                console.log("Using top " + teamPokemon.length + " Pokémon to generate teams");
                 
                 // Get the include list from the UI
-                var includeList = self.getIncludeList ? self.getIncludeList() : [];
+                var includeList = selectedPokemon;
                 
                 if (includeList.length > 0) {
                     console.log("Generating teams that include: " + includeList.join(", "));
                 }
                 
+                // Validate include list - make sure all Pokémon are in our data
+                for (var i = 0; i < includeList.length; i++) {
+                    if (!pokemonMap[includeList[i]]) {
+                        console.warn("Warning: Included Pokémon '" + includeList[i] + "' not found in ranking data");
+                    }
+                }
+                
                 // Generate all possible 3-Pokémon combinations with optional include list
-                var teams = generateTeams(topPokemon, includeList);
+                var teams = generateTeams(teamPokemon, includeList);
+                
+                if (teams.length === 0) {
+                    $(".section.typings .rankings-container").html('<div class="error-message"><p>Error: No valid teams could be generated. Please check your Pokémon selection.</p></div>');
+                    $(".evaluate-all-teams-btn .btn-label").html("Find Best Teams");
+                    return false;
+                }
+                
                 console.log("Generated " + teams.length + " possible team combinations");
                 
                 // Generate all possible matchups, INCLUDING self-matchups (same Pokemon vs itself)
-                var allMatchups = generateMatchups(allPokemon, true);
+                var allMatchups = generateMatchups(battlePokemon, true);
                 console.log("Generated " + allMatchups.length + " possible matchups (including self-matchups)");
                 
                 // Process in batches to prevent UI freezing
-                processBattlesInBatches(teams, allMatchups, allPokemon);
+                processBattlesInBatches(teams, allMatchups, battlePokemon);
                 
                 return true;
             }
             
             // Process battles in batches to keep the UI responsive
-            function processBattlesInBatches(teams, allMatchups, allPokemon) {
+            function processBattlesInBatches(teams, allMatchups, battlePokemon) {
                 var totalTeams = teams.length;
                 var battleResults = {};
                 var teamResults = [];
@@ -265,7 +372,7 @@ var InterfaceMaster = (function () {
                 // Process matchups first
                 processMatchupBatch(0, allMatchups, battleResults, function() {
                     // After all matchups are processed, process teams
-                    processTeamBatch(0, teams, battleResults, allPokemon, teamResults, function(rankedTeams) {
+                    processTeamBatch(0, teams, battleResults, battlePokemon, teamResults, function(rankedTeams) {
                         // When all teams are processed, display results
                         displayResults(rankedTeams);
                     });
@@ -304,10 +411,8 @@ var InterfaceMaster = (function () {
                         var keyFormat = scenario.atk + "_" + scenario.def + "_";
                         
                         // Store results with shield counts in the key
-                        // First key: pokemon1's perspective (attacking with atk shields against pokemon2 with def shields)
-                        // Second key: pokemon2's perspective (attacking with def shields against pokemon1 with atk shields)
-                        battleResults[keyFormat + matchup[0] + "_" + matchup[1]] = result.poke2rating;
                         battleResults[keyFormat + matchup[1] + "_" + matchup[0]] = result.poke1rating;
+                        battleResults[keyFormat + matchup[0] + "_" + matchup[1]] = result.poke2rating;
                     }
                 }
                 
@@ -331,16 +436,20 @@ var InterfaceMaster = (function () {
             }
             
             // Process teams in batches
-            function processTeamBatch(startIndex, teams, battleResults, allPokemon, teamResults, callback) {
+            function processTeamBatch(startIndex, teams, battleResults, battlePokemon, teamResults, callback) {
                 var batchSize = 20;
                 var endIndex = Math.min(startIndex + batchSize, teams.length);
                 
                 for (var i = startIndex; i < endIndex; i++) {
                     var team = teams[i];
-                    var threatScore = calculateThreatScore(team, battleResults, allPokemon);
+                    var threatScore = calculateThreatScore(team, battleResults, battlePokemon);
                     
+                    // Add debug log for each team's threat score
+                    // if (i < 5) { // Only log first few teams to avoid console flooding
+                    //     console.log("Team " + team.join(", ") + " has threat score: " + threatScore);
+                    // }
                     
-                    // Only store pokemon names and threat score for memory efficiency
+                    // Only store pokemon ids and threat score for memory efficiency
                     teamResults.push({
                         pokemon: team,
                         threatScore: threatScore
@@ -356,7 +465,7 @@ var InterfaceMaster = (function () {
                 // If more teams to process, continue in next batch
                 if (endIndex < teams.length) {
                     setTimeout(function() {
-                        processTeamBatch(endIndex, teams, battleResults, allPokemon, teamResults, callback);
+                        processTeamBatch(endIndex, teams, battleResults, battlePokemon, teamResults, callback);
                     }, 0);
                 } else {
                     // All teams processed, rank and prepare results
@@ -371,12 +480,19 @@ var InterfaceMaster = (function () {
                 shield1 = (typeof shield1 !== 'undefined') ? shield1 : 1;
                 shield2 = (typeof shield2 !== 'undefined') ? shield2 : shield1; // Default to shield1 if shield2 not specified
                 
-                var battle = new Battle();
-                var poke1 = new Pokemon(pokemon1, 0, battle);
-                var poke2 = new Pokemon(pokemon2, 0, battle);
-                var formatValue = $(".format-select").val();
-				var cupValue = $(".format-select option:selected").attr("cup") || "all";
-				var cp = parseInt(formatValue) || 1500;
+                // Create a new Battle instance for this simulation
+                var battleSim = new Battle();
+                
+                // Get current settings
+                var cp = battle.getCP() || 1500;
+                var cupName = battle.getCup() ? battle.getCup().name : "all";
+                
+                // Configure the simulation battle
+                battleSim.setCP(cp);
+                battleSim.setCup(cupName);
+                
+                var poke1 = new Pokemon(pokemon1, 0, battleSim);
+                var poke2 = new Pokemon(pokemon2, 0, battleSim);
 
                 poke1.initialize(cp);
                 poke1.selectRecommendedMoveset("overall");
@@ -386,16 +502,13 @@ var InterfaceMaster = (function () {
                 poke2.selectRecommendedMoveset("overall");
                 poke2.setShields(shield2);
 
-				battle.setCP(cp);
-				battle.setCup(cupValue);
-
-                battle.setNewPokemon(poke1, 0, false);
-                battle.setNewPokemon(poke2, 1, false);
+                battleSim.setNewPokemon(poke1, 0, false);
+                battleSim.setNewPokemon(poke2, 1, false);
                 
-                battle.simulate();
+                battleSim.simulate();
 
-                var poke1rating = battle.getBattleRatings()[0];
-                var poke2rating = battle.getBattleRatings()[1];
+                var poke1rating = battleSim.getBattleRatings()[0];
+                var poke2rating = battleSim.getBattleRatings()[1];
 
                 return {
                     poke1rating,
@@ -403,43 +516,17 @@ var InterfaceMaster = (function () {
                 };
             }
 
-            // Get all Pokemon for the selected format/cup
-            function getAllPokemon(gm, battleRange, teamRange){
-                var allPokemon = [];
-                var topPokemon = [];
-
-                var formatValue = $(".format-select").val();
-                var cupValue = $(".format-select option:selected").attr("cup") || "all";
-
-                var key = cupValue + "overall" + formatValue;
-                var rankings = gm.rankings[key];
-
-                for(var i = 0; i < rankings.length; i++){
-                    if (i < battleRange){ // Only consider top 100 for battles
-                        allPokemon.push(rankings[i].speciesId);
-                    }
-                    if(i < teamRange){ // Use top 20 for team generation
-                        topPokemon.push(rankings[i].speciesId);
-                    }
-                }
-
-                return {
-                    allPokemon,
-                    topPokemon
-                };
-            }
-
             // Generate all possible matchups between Pokemon - including self-matchups if enabled
-            function generateMatchups(allPokemon, allowSelfMatchups) {
+            function generateMatchups(battlePokemon, allowSelfMatchups) {
                 // Default to false if not specified
                 allowSelfMatchups = (typeof allowSelfMatchups !== 'undefined') ? allowSelfMatchups : false;
                 
                 if (allowSelfMatchups) {
                     // If we allow self matchups, we need to handle them differently
-                    return generatePairs(allPokemon);
+                    return generatePairs(battlePokemon);
                 } else {
                     // Use regular combinations (no repeats) if self-matchups are not allowed
-                    return self.generateCombinations(allPokemon, 2);
+                    return self.generateCombinations(battlePokemon, 2);
                 }
             }
 
@@ -460,19 +547,19 @@ var InterfaceMaster = (function () {
             }
 
             // Generate all possible teams from top Pokemon with option to include specific Pokemon
-            function generateTeams(topPokemon, include) {
+            function generateTeams(teamPokemon, include) {
                 // Default include to empty array if not provided
                 include = include || [];
                 
                 if (include.length === 0) {
                     // Case 1: No Pokemon to include, generate all possible 3-Pokemon combinations
-                    return self.generateCombinations(topPokemon, 3);
+                    return self.generateCombinations(teamPokemon, 3);
                 } else if (include.length === 3) {
                     // Case 4: Exactly 3 Pokemon to include, just return that team
                     return [include];
                 } else {
                     // Cases 2 & 3: Include 1 or 2 specific Pokemon
-                    var remainingPokemon = topPokemon.filter(function(pokemon) {
+                    var remainingPokemon = teamPokemon.filter(function(pokemon) {
                         // Only keep Pokemon that aren't already in the include list
                         return !include.includes(pokemon);
                     });
@@ -499,9 +586,9 @@ var InterfaceMaster = (function () {
             }
 
             // Calculate threat score for a team with all shield scenarios
-            function calculateThreatScore(team, battleResults, allPokemon){
+            function calculateThreatScore(team, battleResults, battlePokemon){
                 var threatScores = [];
-
+                
                 // Define all shield scenarios
                 var shieldScenarios = [
                     {atk: 0, def: 0},
@@ -516,7 +603,7 @@ var InterfaceMaster = (function () {
                 ];
 
                 // Process each opponent Pokemon
-                for (var i = 0; i < allPokemon.length; i++){
+                for (var i = 0; i < battlePokemon.length; i++){
                     // Store scores for each shield scenario
                     var scenarioScores = [];
                     
@@ -529,12 +616,12 @@ var InterfaceMaster = (function () {
                         var validMatchups = 0;
 
                         // For each Pokemon in our team
-                    for(var j = 0; j < team.length; j++){
+                        for(var j = 0; j < team.length; j++){
                             // Check matchup with this shield configuration
-                            var key = keyFormat + team[j] + "_" + allPokemon[i];
+                            var key = keyFormat + team[j] + "_" + battlePokemon[i];
                             if (battleResults[key] !== undefined) {
                                 // Only log a few results to avoid flooding console
-                                // if (i < 3) {
+                                // if (i < 3 && j === 0 && s === 0) {
                                 //     console.log(key + " has a threat score of " + battleResults[key]);
                                 // }
                                 thisScenarioScore += battleResults[key];
@@ -558,7 +645,6 @@ var InterfaceMaster = (function () {
                             totalScore += scenarioScores[s].score;
                         }
                         var avgScore = totalScore / scenarioScores.length;
-                        // console.log(allPokemon[i] + " has a threat score of " + avgScore);
                         threatScores.push(avgScore);
                     }
                 }
@@ -600,17 +686,17 @@ var InterfaceMaster = (function () {
                 html += '<p class="center">Threat scores calculated using all 9 possible shield scenarios (0-0, 0-1, 0-2, 1-0, 1-1, 1-2, 2-0, 2-1, 2-2)</p>';
                 html += '<table class="teams-table rating-table" cellspacing="0">';
                 html += '<thead><tr><th>Rank</th><th>Team</th><th>Threat Score</th></tr></thead><tbody>';
-  
+                
                 for (var i = 0; i < numToShow; i++) {
                     var result = rankedTeams[i];
                     
                     // Get Pokemon names for display
                     var teamStr = '';
                     for (var j = 0; j < result.pokemon.length; j++) {
-                        // Convert species ID to proper name
+                        // Use the pokemon map instead of creating new Pokemon objects
                         var speciesId = result.pokemon[j];
-                        var pokemon = new Pokemon(speciesId, 0, battle);
-                        teamStr += pokemon.speciesName;
+                        var speciesName = pokemonMap[speciesId] || speciesId;
+                        teamStr += speciesName;
                         
                         if (j < result.pokemon.length - 1) {
                             teamStr += ', ';
@@ -632,17 +718,6 @@ var InterfaceMaster = (function () {
                 // Free memory
                 rankedTeams = null;
             }
-
-            // Helper function to get URL parameters
-            function getURLParameter(name) {
-                var url = window.location.href;
-                name = name.replace(/[\[\]]/g, '\\$&');
-                var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-                    results = regex.exec(url);
-                if (!results) return null;
-                if (!results[2]) return '';
-                return decodeURIComponent(results[2].replace(/\+/g, ' '));
-			}
 
 		    // Generate all possible combinations of size k from an array
 			this.generateCombinations = function(arr, k) {
