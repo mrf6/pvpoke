@@ -10,6 +10,8 @@ var InterfaceMaster = (function () {
 			const DEFAULT_SHIELD_MODE = "average";
 			const DEFAULT_SHIELD_COUNT = 1;
 			const DEFAULT_SCORECARD_COUNT = 20;
+            const NUM_BATTLE_POKEMON = 300;
+            const NUM_TEAM_POKEMON = 100;
 			
 			// Global variables
 			var gm;
@@ -320,7 +322,7 @@ var InterfaceMaster = (function () {
                 $(".section.typings .rankings-container").html('<div class="processing-message"><p>Processing all possible teams. This may take several minutes...</p><div class="progress-container"><div class="progress-bar"></div></div><p class="progress-text">0% complete</p><p class="teams-processed">0 teams processed</p></div>');
                 
                 // Get Pokémon lists from ranking data
-                var pokemonLists = getPokemonLists(50, 50);
+                var pokemonLists = getPokemonLists(NUM_BATTLE_POKEMON, NUM_TEAM_POKEMON);
                 var battlePokemon = pokemonLists.battlePokemon;
                 var teamPokemon = pokemonLists.teamPokemon;
                 
@@ -381,7 +383,7 @@ var InterfaceMaster = (function () {
             
             // Process matchups in batches - Run all 9 possible shield scenarios
             function processMatchupBatch(startIndex, allMatchups, battleResults, callback) {
-                var batchSize = 10; // Reduced batch size since we're doing nine battles per matchup
+                var batchSize = 20; // Reduced batch size since we're doing nine battles per matchup
                 var endIndex = Math.min(startIndex + batchSize, allMatchups.length);
                 
                 // Define all shield scenarios
@@ -437,7 +439,7 @@ var InterfaceMaster = (function () {
             
             // Process teams in batches
             function processTeamBatch(startIndex, teams, battleResults, battlePokemon, teamResults, callback) {
-                var batchSize = 20;
+                var batchSize = 50;
                 var endIndex = Math.min(startIndex + batchSize, teams.length);
                 
                 for (var i = startIndex; i < endIndex; i++) {
