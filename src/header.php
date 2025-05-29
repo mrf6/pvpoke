@@ -274,6 +274,7 @@ if(! isset($OG_IMAGE)){
 					</div>
 				</div>
 				<a class="icon-team <?php if(strpos($_SERVER['REQUEST_URI'], '/team-builder/')): echo "selected"; endif; ?>" href="<?php echo $WEB_ROOT; ?>team-builder/">Team Builder</a>
+				<a class="icon-team <?php if(strpos($_SERVER['REQUEST_URI'], '/team-generator/')): echo "selected"; endif; ?>" href="<?php echo $WEB_ROOT; ?>team-generator/">Team Generator</a>
 				<div class="parent-menu">
 					<a class="icon-train <?php if(strpos($_SERVER['REQUEST_URI'], '/train/')): echo "selected"; endif; ?>" href="<?php echo $WEB_ROOT; ?>train/">
 						Train <span></span>

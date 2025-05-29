@@ -53,6 +53,8 @@ RewriteRule team-builder/([a-zA-Z0-9-]+)/([\d-]+)/([a-zA-Z_]+)/([\da-zA-Z_-]+).*
 RewriteRule team-builder/([a-zA-Z0-9-]+)/([\d-]+)/([a-zA-Z_\-0-9,\.]+).*$ team-builder.php?cup=$1&cp=$2&t=$3 [L,QSA]
 RewriteRule team-builder.?$ team-builder.php [L,QSA]
 
+RewriteRule team-generator.?$ team-generator.php [L,QSA]
+
 RewriteRule train/analysis.?$ train/analysis.php [L,QSA]
 RewriteRule ^train/analysis/([a-zA-Z0-9-]+)/(\d+).*$ train/analysis.php?cup=$1&cp=$2 [L,QSA]
 
