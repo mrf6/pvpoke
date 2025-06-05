@@ -14,15 +14,15 @@ var InterfaceMaster = (function () {
             const NUM_TEAM_POKEMON = 100;
 			// Define all shield scenarios globally
 			const SHIELD_SCENARIOS = [
-				{atk: 0, def: 0},
-				{atk: 0, def: 1},
-				{atk: 0, def: 2},
-				{atk: 1, def: 0},
+				// {atk: 0, def: 0},
+				// {atk: 0, def: 1},
+				// {atk: 0, def: 2},
+				// {atk: 1, def: 0},
 				{atk: 1, def: 1},
-				{atk: 1, def: 2},
-				{atk: 2, def: 0},
-				{atk: 2, def: 1},
-				{atk: 2, def: 2}
+				// {atk: 1, def: 2},
+				// {atk: 2, def: 0},
+				// {atk: 2, def: 1},
+				// {atk: 2, def: 2}
 			];
 
 			// Global variables
@@ -116,7 +116,7 @@ var InterfaceMaster = (function () {
 				
 				for (var i = 0; i < rankingData.length; i++) {
 					var pokemon = rankingData[i];
-					pokemonMap[pokemon.speciesId] = pokemon.speciesName;
+					pokemonMap[pokemon.speciesId] = [pokemon.speciesName, i];
 				}
 			}
 			
@@ -210,7 +210,7 @@ var InterfaceMaster = (function () {
                     
                     for (var i = 0; i < selectedPokemon.length; i++) {
                         var pokemonId = selectedPokemon[i];
-                        var displayName = pokemonMap[pokemonId] || pokemonId;
+                        var displayName = pokemonMap[pokemonId][0] || pokemonId;
                         
                         var $item = $('<div class="include-pokemon-item" data-id="' + pokemonId + '">' + 
                                       '<span class="name">' + displayName + '</span>' + 
@@ -265,7 +265,7 @@ var InterfaceMaster = (function () {
                     
                     // Search by ID and name
                     for (var id in pokemonMap) {
-                        var name = pokemonMap[id];
+                        var name = pokemonMap[id][0];
                         
                         if (id.toLowerCase().includes(query) || name.toLowerCase().includes(query)) {
                             matches.push({
@@ -349,7 +349,7 @@ var InterfaceMaster = (function () {
                 
                 // Validate include list - make sure all Pokémon are in our data
                 for (var i = 0; i < includeList.length; i++) {
-                    if (!pokemonMap[includeList[i]]) {
+                    if (!pokemonMap[includeList[i]][0]) {
                         console.warn("Warning: Included Pokémon '" + includeList[i] + "' not found in ranking data");
                     }
                 }
@@ -384,21 +384,17 @@ var InterfaceMaster = (function () {
                 console.log("Starting to process " + totalTeams + " teams in batches");
                 
                 // Process matchups first
-                processMatchupBatch(0, allMatchups, battleResults, function() {
+                processMatchups(allMatchups, battleResults, function() {
                     // After all matchups are processed, process teams
-                    processTeamBatch(0, teams, battleResults, battlePokemon, teamResults, function(rankedTeams) {
+                    processTeams(teams, battleResults, battlePokemon, teamResults, function(rankedTeams) {
                         // When all teams are processed, display results
                         displayResults(rankedTeams);
                     });
                 });
             }
             
-            // Process matchups in batches - Run all 9 possible shield scenarios
-            function processMatchupBatch(startIndex, allMatchups, battleResults, callback) {
-                var batchSize = 50; // Reduced batch size since we're doing nine battles per matchup
-                var endIndex = Math.min(startIndex + batchSize, allMatchups.length);
-                
-                for (var i = startIndex; i < endIndex; i++) {
+            function processMatchups(allMatchups, battleResults, callback) {
+                for (var i = 0; i < allMatchups.length; i++) {
                     var matchup = allMatchups[i];
                     
                     // Run all shield scenarios
@@ -415,64 +411,45 @@ var InterfaceMaster = (function () {
                         battleResults[keyFormat + matchup[1] + "_" + matchup[0]] = result.poke1rating;
                         battleResults[keyFormat + matchup[0] + "_" + matchup[1]] = result.poke2rating;
                     }
+
+
+                    if (i%1000 == 0){
+                        console.log(i/allMatchups.length * 100 + "% complete")
+                    }
+                    
+                    // TODO: FIX PROGRESS BAR
+                    // var percentComplete = Math.floor((i / allMatchups.length) * 100);
+                    // $(".progress-bar").css("width", percentComplete + "%");
+                    // $(".progress-text").text("Processing matchups: " + percentComplete + "% complete");
+                    // $(".teams-processed").text(i + " of " + allMatchups.length + " matchups processed");
                 }
-                
-                // Update progress
-                var percentComplete = Math.floor((endIndex / allMatchups.length) * 100);
-                $(".progress-bar").css("width", percentComplete + "%");
-                $(".progress-text").text("Processing matchups: " + percentComplete + "% complete");
-                $(".teams-processed").text(endIndex + " of " + allMatchups.length + " matchups processed");
-                
-                // If more matchups to process, continue in next batch
-                if (endIndex < allMatchups.length) {
-                    setTimeout(function() {
-                        processMatchupBatch(endIndex, allMatchups, battleResults, callback);
-                    }, 0);
-                } else {
-                    // All matchups processed, start team evaluation
-                    console.log("All matchups processed, starting team evaluation");
-                    console.log("Battle results contain " + Object.keys(battleResults).length + " entries");
-                    callback();
-                }
+                callback();
             }
             
-            // Process teams in batches
-            function processTeamBatch(startIndex, teams, battleResults, battlePokemon, teamResults, callback) {
-                var batchSize = 100;
-                var endIndex = Math.min(startIndex + batchSize, teams.length);
-                
-                for (var i = startIndex; i < endIndex; i++) {
+            // Process teams
+            function processTeams(teams, battleResults, battlePokemon, teamResults, callback) {
+                for (var i = 0; i < teams.length; i++) {
                     var team = teams[i];
                     var threatScore = calculateThreatScore(team, battleResults, battlePokemon);
-                    
-                    // Add debug log for each team's threat score
-                    // if (i < 5) { // Only log first few teams to avoid console flooding
-                    //     console.log("Team " + team.join(", ") + " has threat score: " + threatScore);
-                    // }
-                    
-                    // Only store pokemon ids and threat score for memory efficiency
+
                     teamResults.push({
                         pokemon: team,
                         threatScore: threatScore
                     });
+
+                    if (i%1000 == 0){
+                        console.log(i/teams.length*100 + "% complete")
+                    }
+                    
+                    // TODO: FIX PROGRESS BAR
+                    // var percentComplete = Math.floor((i / teams.length) * 100);
+                    // $(".progress-bar").css("width", percentComplete + "%");
+                    // $(".progress-text").text("Evaluating teams: " + percentComplete + "% complete");
+                    // $(".teams-processed").text(i + " of " + teams.length + " teams processed");
                 }
-                
-                // Update progress
-                var percentComplete = Math.floor((endIndex / teams.length) * 100);
-                $(".progress-bar").css("width", percentComplete + "%");
-                $(".progress-text").text("Evaluating teams: " + percentComplete + "% complete");
-                $(".teams-processed").text(endIndex + " of " + teams.length + " teams processed");
-                
-                // If more teams to process, continue in next batch
-                if (endIndex < teams.length) {
-                    setTimeout(function() {
-                        processTeamBatch(endIndex, teams, battleResults, battlePokemon, teamResults, callback);
-                    }, 0);
-                } else {
-                    // All teams processed, rank and prepare results
-                    var rankedTeams = rankTeams(teamResults);
-                    callback(rankedTeams);
-                }
+
+                var rankedTeams = rankTeams(teamResults);
+                callback(rankedTeams);
             }
 
             // Run a battle between two Pokemon with specific shield counts for each
@@ -589,6 +566,8 @@ var InterfaceMaster = (function () {
             // Calculate threat score for a team with all shield scenarios
             function calculateThreatScore(team, battleResults, battlePokemon){
                 var threatScores = [];
+
+                // console.log(team);
                 
                 // Process each opponent Pokemon
                 for (var i = 0; i < battlePokemon.length; i++){
@@ -608,10 +587,6 @@ var InterfaceMaster = (function () {
                             // Check matchup with this shield configuration
                             var key = keyFormat + team[j] + "_" + battlePokemon[i];
                             if (battleResults[key] !== undefined) {
-                                // Only log a few results to avoid flooding console
-                                // if (i < 3 && j === 0 && s === 0) {
-                                //     console.log(key + " has a threat score of " + battleResults[key]);
-                                // }
                                 thisScenarioScore += battleResults[key];
                                 validMatchups++;
                             }
@@ -633,12 +608,19 @@ var InterfaceMaster = (function () {
                             totalScore += scenarioScores[s].score;
                         }
                         var avgScore = totalScore / scenarioScores.length;
-                        threatScores.push(avgScore);
+                        var opponentRank = pokemonMap[battlePokemon[i]][1];
+                        // console.log(opponentRank);
+                        var weight = 1 + (battlePokemon.length - opponentRank)/100;
+                        // console.log(weight);
+                        threatScores.push([avgScore, weight]);
+
+                        // console.log("pokemon ", battlePokemon[i], " has threat score ", avgScore)
+                        // console.log("pokemon ", battlePokemon[i], " has weighted threat score ", avgScore + weight)
                     }
                 }
 
                 // Sort threat scores in descending order (higher is worse)
-                threatScores.sort(function(a, b) { return b - a; });
+                threatScores.sort(function(a, b) { return b[0] - a[0]; });
                 
                 // Return the mean of the 20 highest threat scores
                 var count = Math.min(20, threatScores.length);
@@ -646,7 +628,7 @@ var InterfaceMaster = (function () {
                 
                 var sum = 0;
                 for (var i = 0; i < count; i++) {
-                    sum += threatScores[i];
+                    sum += threatScores[i][0] * threatScores[i][1];
                 }
                 return Math.round(sum / count * 1000) / 1000;
             }
@@ -683,7 +665,7 @@ var InterfaceMaster = (function () {
                     for (var j = 0; j < result.pokemon.length; j++) {
                         // Use the pokemon map instead of creating new Pokemon objects
                         var speciesId = result.pokemon[j];
-                        var speciesName = pokemonMap[speciesId] || speciesId;
+                        var speciesName = pokemonMap[speciesId][0] || speciesId;
                         teamStr += speciesName;
                         
                         if (j < result.pokemon.length - 1) {
