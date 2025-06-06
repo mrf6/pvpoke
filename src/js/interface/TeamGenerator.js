@@ -10,19 +10,19 @@ var InterfaceMaster = (function () {
 			const DEFAULT_SHIELD_MODE = "average";
 			const DEFAULT_SHIELD_COUNT = 1;
 			const DEFAULT_SCORECARD_COUNT = 20;
-            const NUM_BATTLE_POKEMON = 100;
-            const NUM_TEAM_POKEMON = 100;
+            const NUM_BATTLE_POKEMON = 80;
+            const NUM_TEAM_POKEMON = 80;
 			// Define all shield scenarios globally
 			const SHIELD_SCENARIOS = [
-				// {atk: 0, def: 0},
-				// {atk: 0, def: 1},
-				// {atk: 0, def: 2},
+				{atk: 0, def: 0},
+				{atk: 0, def: 1},
+				{atk: 0, def: 2},
 				// {atk: 1, def: 0},
 				{atk: 1, def: 1},
-				// {atk: 1, def: 2},
+				{atk: 1, def: 2},
 				// {atk: 2, def: 0},
-				// {atk: 2, def: 1},
-				// {atk: 2, def: 2}
+				{atk: 2, def: 1},
+				{atk: 2, def: 2}
 			];
 
 			// Global variables
@@ -604,13 +604,18 @@ var InterfaceMaster = (function () {
                     // Average all shield scenarios
                     if (scenarioScores.length > 0) {
                         var totalScore = 0;
+                        var annoying_pokemon = ['dedenne', 'furret', 'talonflame', 'lapras', 'blastoise', 'feraligatr', 'feraligatr_shadow', 'tinkaton', 'azumarill', 'drapion', 'drapion_shadow', 'morpeko', 'primeape', 'primeape_shadow', 'cradily', 'blastoise', 'jumpluff', 'jumpluff_shadow', 'sandslash_alolan', 'sandslash_alolan_shadow', 'diggersby', 'wigglytuff'];
                         for (var s = 0; s < scenarioScores.length; s++) {
                             totalScore += scenarioScores[s].score;
                         }
                         var avgScore = totalScore / scenarioScores.length;
                         var opponentRank = pokemonMap[battlePokemon[i]][1];
                         // console.log(opponentRank);
-                        var weight = 1 + (battlePokemon.length - opponentRank)/100;
+                        if (annoying_pokemon.includes(battlePokemon[i])){
+                            var weight = 10;
+                        } else {
+                            var weight = Math.exp((battlePokemon.length - opponentRank)/battlePokemon.length);
+                        }
                         // console.log(weight);
                         threatScores.push([avgScore, weight]);
 
@@ -622,9 +627,9 @@ var InterfaceMaster = (function () {
                 // Sort threat scores in descending order (higher is worse)
                 threatScores.sort(function(a, b) { return b[0] - a[0]; });
                 
-                // Return the mean of the 20 highest threat scores
-                var count = Math.min(20, threatScores.length);
-                if (count === 0) return 0;
+                // Return the mean of the highest threat scores
+                var count = threatScores.length - 10;
+                // if (count === 0) return 0;
                 
                 var sum = 0;
                 for (var i = 0; i < count; i++) {
