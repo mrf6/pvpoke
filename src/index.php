@@ -1,5 +1,7 @@
 <?php require_once 'header.php'; ?>
 
+<div class="banner-link">Take the <a href="https://forms.gle/jUVrKMjGRkYSzui59" target="_blank">PvPoke.com feedback survey</a> and help improve the website!</div>
+
 <div class="section home white">
 
 	<p class="small">Welcome to PvPoke.com, an open-source tool for Pokemon GO PvP and GO Battle League!</p>
@@ -107,10 +109,10 @@ if (strpos($WEB_ROOT, 'src') !== false) : ?>
 	<script src="<?php echo $WEB_ROOT; ?>js/interface/HomeInterface.js?v=<?php echo $SITE_VERSION; ?>"></script>
 	<script src="<?php echo $WEB_ROOT; ?>js/interface/ModalWindow.js?v=<?php echo $SITE_VERSION; ?>"></script>
 	<script src="<?php echo $WEB_ROOT; ?>js/interface/PokeSearch.js?v=<?php echo $SITE_VERSION; ?>"></script>
-	<script src="<?php echo $WEB_ROOT; ?>js/battle/TimelineEvent.js?v=<?php echo $SITE_VERSION; ?>"></script>
-	<script src="<?php echo $WEB_ROOT; ?>js/battle/TimelineAction.js?v=<?php echo $SITE_VERSION; ?>"></script>
+	<script src="<?php echo $WEB_ROOT; ?>js/battle/timeline/TimelineEvent.js?v=<?php echo $SITE_VERSION; ?>"></script>
+	<script src="<?php echo $WEB_ROOT; ?>js/battle/timeline/TimelineAction.js?v=<?php echo $SITE_VERSION; ?>"></script>
 	<script src="<?php echo $WEB_ROOT; ?>js/battle/Battle.js?v=<?php echo $SITE_VERSION; ?>"></script>
-	<script src="<?php echo $WEB_ROOT; ?>js/battle/TeamRanker.js?v=<?php echo $SITE_VERSION; ?>"></script>
+	<script src="<?php echo $WEB_ROOT; ?>js/battle/rankers/TeamRanker.js?v=<?php echo $SITE_VERSION; ?>"></script>
 	<script src="<?php echo $WEB_ROOT; ?>js/Main.js?v=<?php echo $SITE_VERSION; ?>"></script>
 
 <?php else: ?>
