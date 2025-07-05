@@ -69,7 +69,7 @@ header .menu {
   padding: 3px 0;
 }
 header .menu a {
-  display: block;
+  display: inline-flex;
   margin-left: 20px;
   color: #003462;
   text-decoration: none;
