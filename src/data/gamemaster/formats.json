@@ -1,32 +1,5 @@
 [
 	{
-		"title": "Fossil Cup",
-		"cup": "fossil",
-		"cp": 1500,
-		"meta": "fossil",
-		"showCup": true,
-		"showFormat": true,
-		"showMeta": true,
-		"rules": [
-			"Pokémon must be at or below 1,500 CP to enter.",
-			"Only Water-, Rock-, and Steel-type Pokémon are eligible.",
-			"Charizard is not allowed."
-		]
-	},
-	{
-		"title": "Summer Cup (Ultra League)",
-		"cup": "summer",
-		"cp": 2500,
-		"meta": "summerultra",
-		"showCup": true,
-		"showFormat": true,
-		"showMeta": true,
-		"rules": [
-			"Pokémon must be at or below 2,500 CP to enter.",
-			"Only Normal-, Fire-, Water-, Grass-, Electric-, and Bug-type Pokémon are eligible."
-		]
-	},
-	{
 		"title": "Little Element Cup",
 		"cup": "element",
 		"cp": 500,
@@ -38,6 +11,62 @@
 			"Pokémon must be at or below 500 CP to enter.",
 			"Only Fire-, Water-, and Grass-type Pokémon are eligible.",
 			"Only Pokémon that are able to evolve and have not evolved even once will be eligible."
+		]
+	},
+	{
+		"title": "Hisui Cup",
+		"cup": "hisui",
+		"cp": 1500,
+		"meta": "hisui",
+		"showCup": true,
+		"showFormat": true,
+		"showMeta": true,
+		"rules": [
+			"Pokémon must be at or below 1,500 CP to enter.",
+			"Only Pokémon first discovered in the Hisui region or Pokémon with a Pokédex number from #387 to #493 will be allowed."
+		]
+	},
+	{
+		"title": "Sunshine Cup",
+		"cup": "sunshine",
+		"cp": 1500,
+		"meta": "sunshine",
+		"showCup": true,
+		"showFormat": true,
+		"showMeta": true,
+		"rules": [
+			"Pokémon must be at or below 1,500 CP to enter.",
+			"Only Normal-, Fire-, Grass-, and Ground-type Pokémon are eligible.",
+			"Charizard is not allowed."
+		]
+	},
+	{
+		"title": "Fossil Cup",
+		"cup": "fossil",
+		"cp": 1500,
+		"meta": "fossil",
+		"showCup": false,
+		"showFormat": false,
+		"showMeta": false,
+		"hideRankings": true,
+		"rules": [
+			"Pokémon must be at or below 1,500 CP to enter.",
+			"Only Water-, Rock-, and Steel-type Pokémon are eligible.",
+			"Charizard is not allowed."
+		]
+	},
+	{
+		"title": "Summer Cup (Ultra League)",
+		"cup": "summer",
+		"cp": 2500,
+		"meta": "summerultra",
+		"showCup": false,
+		"showFormat": false,
+		"showMeta": false,
+		"hideRankings": true,
+		"rules": [
+			"Pokémon must be at or below 2,500 CP to enter.",
+			"Only Normal-, Fire-, Water-, Grass-, Electric-, and Bug-type Pokémon are eligible."
 		]
 	},
 	{
@@ -75,7 +104,7 @@
 		"hideRankings": true
 	},
 	{
-		"title": "Battle Tower (Aurora)",
+		"title": "Battle Frontier (Aurora)",
 		"cup": "aurora",
 		"cp": 1500,
 		"meta": "aurora",
@@ -84,7 +113,7 @@
 		"showMeta": true
 	},
 	{
-		"title": "Battle Tower (Onyx)",
+		"title": "Battle Frontier (Onyx)",
 		"cup": "onyx",
 		"cp": 1500,
 		"meta": "onyx",
@@ -93,7 +122,7 @@
 		"showMeta": true
 	},
 	{
-		"title": "Battle Tower (Ultra)",
+		"title": "Battle Frontier (Ultra)",
 		"cup": "battlefrontierultra",
 		"cp": 2500,
 		"meta": "ultra",
@@ -102,19 +131,10 @@
 		"showMeta": true
 	},
 	{
-		"title": "Battle Tower (Master)",
+		"title": "Battle Frontier (Master)",
 		"cup": "battlefrontiermaster",
 		"cp": 10000,
 		"meta": "battlefrontiermaster",
-		"showCup": true,
-		"showFormat": true,
-		"showMeta": true
-	},
-	{
-		"title": "Devon Rivalry Cup",
-		"cup": "rivalry",
-		"cp": 1500,
-		"meta": "rivalry",
 		"showCup": true,
 		"showFormat": true,
 		"showMeta": true
@@ -124,6 +144,15 @@
 		"cup": "ascension",
 		"cp": 1500,
 		"meta": "ascension",
+		"showCup": true,
+		"showFormat": true,
+		"showMeta": true
+	},
+	{
+		"title": "Devon (Championship Invitational S2)",
+		"cup": "devonchampionship",
+		"cp": 1500,
+		"meta": "devonchampionship",
 		"showCup": true,
 		"showFormat": true,
 		"showMeta": true

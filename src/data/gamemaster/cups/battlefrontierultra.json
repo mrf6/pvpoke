@@ -4,6 +4,6 @@
     "include": [],
     "exclude": [{
         "filterType": "id",
-        "values": []
+        "values": ["feraligatr","bellibolt","cradily","virizion","lapras","tentacruel","forretress","dusknoir","talonflame"]
     }]
 }
